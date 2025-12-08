@@ -18,6 +18,9 @@ from functools import wraps
 import logging
 import time
 import socket
+import requests
+import base64
+import ssl
 
 # Tentar carregar python-dotenv (opcional)
 try:
@@ -44,6 +47,15 @@ SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '').replace(' ', '')
 OWNER_EMAIL = os.getenv('OWNER_EMAIL', '')
 SITE_NAME = os.getenv('SITE_NAME', 'Investir é Realizar')
 GUIDE_TITLE = os.getenv('GUIDE_TITLE', 'Guia Rápido: Principais Corretoras do Brasil')
+
+# Configurações Resend (API REST - alternativa ao SMTP)
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
+RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', SMTP_USER)  # Usa SMTP_USER como padrão
+USE_RESEND = os.getenv('USE_RESEND', 'false').lower() == 'true'  # Ativar Resend explicitamente
+
+# Configurações avançadas SMTP
+SMTP_TIMEOUT = int(os.getenv('SMTP_TIMEOUT', '60'))  # Timeout em segundos (padrão: 60)
+SKIP_CONNECTIVITY_CHECK = os.getenv('SKIP_CONNECTIVITY_CHECK', 'false').lower() == 'true'  # Pular verificação de conectividade
 
 # Rate limiting simples (em memória)
 request_counts = {}
@@ -135,29 +147,116 @@ def check_network_connectivity(host, port, timeout=5):
         logger.warning(f'Não foi possível conectar a {host}:{port} - {str(e)}')
         return False
 
+def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
+    """Envia e-mail usando a API REST do Resend"""
+    if not RESEND_API_KEY:
+        logger.warning('RESEND_API_KEY não configurada. Pulando envio via Resend.')
+        return False
+    
+    if not RESEND_FROM_EMAIL:
+        logger.warning('RESEND_FROM_EMAIL não configurada. Pulando envio via Resend.')
+        return False
+    
+    logger.info(f'Tentando enviar e-mail via Resend para {to_email}')
+    
+    try:
+        # Preparar dados do e-mail
+        email_data = {
+            'from': RESEND_FROM_EMAIL,
+            'to': [to_email],
+            'subject': subject,
+            'text': body
+        }
+        
+        # Adicionar anexo PDF se existir
+        attachments = []
+        if pdf_path and os.path.exists(pdf_path):
+            logger.info(f'Anexando PDF: {pdf_path}')
+            try:
+                with open(pdf_path, 'rb') as f:
+                    pdf_content = f.read()
+                    pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                    attachments.append({
+                        'filename': 'CORRETORAS - Investir é Realizar.pdf',
+                        'content': pdf_base64
+                    })
+                logger.info('PDF preparado para anexo')
+            except Exception as pdf_error:
+                logger.error(f'Erro ao preparar PDF: {str(pdf_error)}')
+        
+        if attachments:
+            email_data['attachments'] = attachments
+        
+        # Enviar via API Resend
+        headers = {
+            'Authorization': f'Bearer {RESEND_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(
+            'https://api.resend.com/emails',
+            json=email_data,
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {result.get("id", "N/A")})')
+            return True
+        else:
+            logger.error(f'❌ Erro ao enviar e-mail via Resend: {response.status_code} - {response.text}')
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f'❌ Erro de conexão ao enviar e-mail via Resend: {str(e)}')
+        return False
+    except Exception as e:
+        logger.error(f'❌ Erro inesperado ao enviar e-mail via Resend: {type(e).__name__}: {str(e)}')
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
+
 def send_email(to_email, subject, body, pdf_path=None, name='', max_retries=3):
-    """Envia e-mail com PDF anexado com retry automático"""
-    # Verificar credenciais
+    """Envia e-mail com PDF anexado com retry automático
+    Tenta Resend primeiro (se configurado), depois SMTP como fallback"""
+    
+    # Tentar Resend primeiro se estiver configurado
+    if USE_RESEND and RESEND_API_KEY:
+        logger.info('Resend configurado. Tentando enviar via API REST...')
+        if send_email_resend(to_email, subject, body, pdf_path, name):
+            return True
+        logger.warning('Falha ao enviar via Resend. Tentando SMTP como fallback...')
+    
+    # Fallback para SMTP
+    # Verificar credenciais SMTP
     if not SMTP_USER or not SMTP_PASSWORD:
         logger.warning('Credenciais SMTP não configuradas. E-mail não será enviado.')
         logger.warning(f'SMTP_USER: {"Configurado" if SMTP_USER else "NÃO configurado"}')
         logger.warning(f'SMTP_PASSWORD: {"Configurado" if SMTP_PASSWORD else "NÃO configurado"}')
+        if not USE_RESEND or not RESEND_API_KEY:
+            logger.error('Nenhum método de envio configurado (nem Resend nem SMTP)')
         return False
     
-    logger.info(f'Tentando enviar e-mail para {to_email}')
+    logger.info(f'Tentando enviar e-mail via SMTP para {to_email}')
     logger.info(f'SMTP Server: {SMTP_SERVER}:{SMTP_PORT}')
     logger.info(f'SMTP User: {SMTP_USER}')
     
-    # Verificar conectividade de rede primeiro
-    logger.info('Verificando conectividade de rede...')
-    if not check_network_connectivity(SMTP_SERVER, SMTP_PORT):
-        logger.error(f'❌ Não foi possível conectar ao servidor SMTP {SMTP_SERVER}:{SMTP_PORT}')
-        logger.error('Possíveis causas:')
-        logger.error('1. O container não tem acesso à internet')
-        logger.error('2. O provedor de hospedagem está bloqueando conexões SMTP')
-        logger.error('3. Problemas de DNS ou firewall')
-        logger.error('Sugestão: Considere usar um serviço de e-mail com API REST (SendGrid, Resend, Mailgun)')
-        return False
+    # Verificar conectividade de rede primeiro (mas não bloquear se falhar)
+    if not SKIP_CONNECTIVITY_CHECK:
+        logger.info('Verificando conectividade de rede...')
+        connectivity_ok = check_network_connectivity(SMTP_SERVER, SMTP_PORT)
+        if not connectivity_ok:
+            logger.warning(f'⚠️ Verificação de conectividade falhou para {SMTP_SERVER}:{SMTP_PORT}')
+            logger.warning('Mas vamos tentar mesmo assim - às vezes a verificação falha mas o SMTP funciona')
+            logger.warning('Possíveis causas do bloqueio:')
+            logger.warning('1. O container não tem acesso à internet')
+            logger.warning('2. O provedor de hospedagem está bloqueando conexões SMTP')
+            logger.warning('3. Problemas de DNS ou firewall')
+        else:
+            logger.info('✅ Conectividade de rede OK')
+    else:
+        logger.info('⏭️ Verificação de conectividade pulada (SKIP_CONNECTIVITY_CHECK=true)')
     
     try:
         msg = MIMEMultipart()
@@ -203,22 +302,41 @@ def send_email(to_email, subject, body, pdf_path=None, name='', max_retries=3):
                 try:
                     logger.info(f'Tentativa {attempt + 1}/{max_retries} - Conectando ao servidor SMTP na porta {port}...')
                     
+                    # Criar contexto SSL mais robusto para Gmail
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = True
+                    ssl_context.verify_mode = ssl.CERT_REQUIRED
+                    
                     if port == 587:
-                        # Tentar TLS na porta 587
+                        # Tentar TLS na porta 587 (método recomendado do Gmail)
                         logger.info(f'Tentando conexão TLS na porta {port}...')
-                        server = smtplib.SMTP(SMTP_SERVER, port, timeout=30)
-                        logger.info('Iniciando TLS...')
-                        server.starttls()
+                        # Timeout configurável para conexões lentas
+                        server = smtplib.SMTP(SMTP_SERVER, port, timeout=SMTP_TIMEOUT)
+                        # Habilitar debug se necessário (comentar em produção)
+                        # server.set_debuglevel(1)
+                        logger.info(f'Iniciando TLS com contexto SSL seguro (timeout: {SMTP_TIMEOUT}s)...')
+                        server.starttls(context=ssl_context)
+                        logger.info('TLS estabelecido com sucesso')
                     else:
                         # Usar SSL na porta 465
-                        logger.info(f'Tentando conexão SSL na porta {port}...')
-                        server = smtplib.SMTP_SSL(SMTP_SERVER, port, timeout=30)
+                        logger.info(f'Tentando conexão SSL direta na porta {port}...')
+                        # Timeout configurável para conexões lentas
+                        server = smtplib.SMTP_SSL(SMTP_SERVER, port, timeout=SMTP_TIMEOUT, context=ssl_context)
+                        logger.info('Conexão SSL estabelecida com sucesso')
                     
-                    logger.info('Fazendo login...')
+                    # Configurar timeout para operações
+                    server.timeout = SMTP_TIMEOUT
+                    
+                    logger.info('Fazendo login com credenciais Gmail...')
                     server.login(SMTP_USER, SMTP_PASSWORD)
-                    logger.info('Login bem-sucedido. Enviando mensagem...')
+                    logger.info('✅ Login bem-sucedido!')
+                    
+                    logger.info('Enviando mensagem...')
                     server.send_message(msg)
+                    logger.info('Mensagem enviada ao servidor')
+                    
                     server.quit()
+                    logger.info('Conexão fechada')
                     
                     logger.info(f'✅ E-mail enviado com sucesso para {to_email}')
                     return True
@@ -521,18 +639,35 @@ if __name__ == '__main__':
     # Verificar configurações de e-mail
     logger.info('=' * 50)
     logger.info('Verificando configurações de e-mail...')
+    
+    # Resend (API REST)
+    logger.info('--- Resend (API REST) ---')
+    logger.info(f'USE_RESEND: {"✅ Ativado" if USE_RESEND else "❌ Desativado"}')
+    logger.info(f'RESEND_API_KEY: {"✅ Configurado" if RESEND_API_KEY else "❌ NÃO configurado"}')
+    logger.info(f'RESEND_FROM_EMAIL: {RESEND_FROM_EMAIL if RESEND_FROM_EMAIL else "❌ NÃO configurado"}')
+    
+    # SMTP (Fallback)
+    logger.info('--- SMTP (Fallback) ---')
     logger.info(f'SMTP_SERVER: {SMTP_SERVER}')
     logger.info(f'SMTP_PORT: {SMTP_PORT}')
+    logger.info(f'SMTP_TIMEOUT: {SMTP_TIMEOUT}s')
+    logger.info(f'SKIP_CONNECTIVITY_CHECK: {"✅ Sim" if SKIP_CONNECTIVITY_CHECK else "❌ Não"}')
     logger.info(f'SMTP_USER: {"✅ Configurado" if SMTP_USER else "❌ NÃO configurado"}')
     logger.info(f'SMTP_PASSWORD: {"✅ Configurado" if SMTP_PASSWORD else "❌ NÃO configurado"}')
     logger.info(f'OWNER_EMAIL: {OWNER_EMAIL if OWNER_EMAIL else "❌ NÃO configurado"}')
     logger.info('=' * 50)
     
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning('⚠️ SMTP não configurado. E-mails não serão enviados.')
-        logger.info('Configure as variáveis de ambiente no Railway: SMTP_USER, SMTP_PASSWORD, OWNER_EMAIL')
+    # Verificar se há método de envio configurado
+    if USE_RESEND and RESEND_API_KEY:
+        logger.info('✅ Resend configurado - usando API REST para envio de e-mails')
+        if SMTP_USER and SMTP_PASSWORD:
+            logger.info('✅ SMTP também configurado - será usado como fallback se Resend falhar')
+    elif SMTP_USER and SMTP_PASSWORD:
+        logger.info('✅ SMTP configurado - usando SMTP para envio de e-mails')
+        logger.info('💡 Dica: Configure RESEND_API_KEY e USE_RESEND=true para usar API REST (mais confiável)')
     else:
-        logger.info('✅ Configurações SMTP encontradas')
+        logger.warning('⚠️ Nenhum método de envio configurado!')
+        logger.warning('Configure RESEND_API_KEY e USE_RESEND=true OU SMTP_USER e SMTP_PASSWORD')
     
     logger.info('Servidor iniciando...')
     
