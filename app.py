@@ -20,6 +20,7 @@ import time
 import socket
 import base64
 import ssl
+import threading
 
 # Tentar carregar python-dotenv (opcional)
 try:
@@ -485,8 +486,11 @@ def create_lead():
         
         lead_id = cursor.lastrowid
         conn.commit()
+        conn.close()
         
-        # Preparar e-mail para o lead
+        logger.info(f'Lead criado com sucesso: {email} (ID: {lead_id})')
+        
+        # Preparar dados para envio de e-mail em background
         email_subject = f'Seu PDF: {GUIDE_TITLE}'
         email_body = f'''
 Oi, {name}!
@@ -502,28 +506,37 @@ Bons estudos!
 Este e-mail foi enviado automaticamente. Por favor, não responda.
         '''.strip()
         
-        # Enviar e-mail ao lead
-        email_sent = send_email(
-            email,
-            email_subject,
-            email_body,
-            PDF_PATH,
-            name
-        )
-        
-        # Atualizar status do envio
-        if email_sent:
-            cursor.execute('''
-                UPDATE leads 
-                SET email_sent = 1, email_sent_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (lead_id,))
-            conn.commit()
-        
-        # Notificar o dono (opcional)
-        if OWNER_EMAIL and email_sent:
-            owner_subject = f'Novo lead: {name}'
-            owner_body = f'''
+        # Função para enviar e-mail em background
+        def send_email_background():
+            try:
+                # Enviar e-mail ao lead
+                email_sent = send_email(
+                    email,
+                    email_subject,
+                    email_body,
+                    PDF_PATH,
+                    name
+                )
+                
+                # Atualizar status do envio no banco
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                if email_sent:
+                    cursor.execute('''
+                        UPDATE leads 
+                        SET email_sent = 1, email_sent_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ''', (lead_id,))
+                    conn.commit()
+                    logger.info(f'✅ E-mail enviado e status atualizado para lead {lead_id}')
+                else:
+                    logger.warning(f'⚠️ E-mail não foi enviado para lead {lead_id}')
+                conn.close()
+                
+                # Notificar o dono (opcional) - também em background
+                if OWNER_EMAIL and email_sent:
+                    owner_subject = f'Novo lead: {name}'
+                    owner_body = f'''
 Novo lead capturado:
 
 Nome: {name}
@@ -534,14 +547,18 @@ IP: {ip_address}
 Data: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
 
 E-mail enviado: {'Sim' if email_sent else 'Não'}
-            '''.strip()
-            
-            send_email(OWNER_EMAIL, owner_subject, owner_body)
+                    '''.strip()
+                    
+                    send_email(OWNER_EMAIL, owner_subject, owner_body)
+            except Exception as e:
+                logger.error(f'Erro ao enviar e-mail em background para lead {lead_id}: {str(e)}')
         
-        conn.close()
+        # Iniciar envio de e-mail em thread separada (não bloqueia a resposta)
+        email_thread = threading.Thread(target=send_email_background, daemon=True)
+        email_thread.start()
+        logger.info(f'Envio de e-mail iniciado em background para {email}')
         
-        logger.info(f'Lead criado com sucesso: {email} (ID: {lead_id})')
-        
+        # Retornar sucesso IMEDIATAMENTE (antes do envio do e-mail)
         return jsonify({
             'success': True,
             'message': 'Lead registrado com sucesso!',
