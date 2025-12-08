@@ -155,7 +155,7 @@ def send_email(to_email, subject, body, pdf_path=None, name=''):
                         encoders.encode_base64(part)
                         part.add_header(
                             'Content-Disposition',
-                            f'attachment; filename=guia-corretoras.pdf'
+                            f'attachment; filename="CORRETORAS - Investir é Realizar.pdf"'
                         )
                         msg.attach(part)
                     logger.info('PDF anexado com sucesso')
