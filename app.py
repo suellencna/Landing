@@ -125,9 +125,16 @@ def sanitize_input(text):
 
 def send_email(to_email, subject, body, pdf_path=None, name=''):
     """Envia e-mail com PDF anexado"""
+    # Verificar credenciais
     if not SMTP_USER or not SMTP_PASSWORD:
         logger.warning('Credenciais SMTP não configuradas. E-mail não será enviado.')
+        logger.warning(f'SMTP_USER: {"Configurado" if SMTP_USER else "NÃO configurado"}')
+        logger.warning(f'SMTP_PASSWORD: {"Configurado" if SMTP_PASSWORD else "NÃO configurado"}')
         return False
+    
+    logger.info(f'Tentando enviar e-mail para {to_email}')
+    logger.info(f'SMTP Server: {SMTP_SERVER}:{SMTP_PORT}')
+    logger.info(f'SMTP User: {SMTP_USER}')
     
     try:
         msg = MIMEMultipart()
@@ -138,28 +145,50 @@ def send_email(to_email, subject, body, pdf_path=None, name=''):
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
         
         # Anexar PDF se existir
-        if pdf_path and os.path.exists(pdf_path):
-            with open(pdf_path, 'rb') as attachment:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= {os.path.basename(pdf_path)}'
-                )
-                msg.attach(part)
+        if pdf_path:
+            if os.path.exists(pdf_path):
+                logger.info(f'Anexando PDF: {pdf_path}')
+                try:
+                    with open(pdf_path, 'rb') as attachment:
+                        part = MIMEBase('application', 'octet-stream')
+                        part.set_payload(attachment.read())
+                        encoders.encode_base64(part)
+                        part.add_header(
+                            'Content-Disposition',
+                            f'attachment; filename=guia-corretoras.pdf'
+                        )
+                        msg.attach(part)
+                    logger.info('PDF anexado com sucesso')
+                except Exception as pdf_error:
+                    logger.error(f'Erro ao anexar PDF: {str(pdf_error)}')
+                    # Continua sem o PDF
+            else:
+                logger.warning(f'PDF não encontrado: {pdf_path}')
         
         # Conectar e enviar
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        logger.info('Conectando ao servidor SMTP...')
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
+        logger.info('Iniciando TLS...')
         server.starttls()
+        logger.info('Fazendo login...')
         server.login(SMTP_USER, SMTP_PASSWORD)
+        logger.info('Login bem-sucedido. Enviando mensagem...')
         server.send_message(msg)
         server.quit()
         
-        logger.info(f'E-mail enviado com sucesso para {to_email}')
+        logger.info(f'✅ E-mail enviado com sucesso para {to_email}')
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f'❌ Erro de autenticação SMTP: {str(e)}')
+        logger.error('Verifique: 1) Senha de app está correta? 2) Verificação em duas etapas está ativada?')
+        return False
+    except smtplib.SMTPException as e:
+        logger.error(f'❌ Erro SMTP: {str(e)}')
+        return False
     except Exception as e:
-        logger.error(f'Erro ao enviar e-mail: {str(e)}')
+        logger.error(f'❌ Erro ao enviar e-mail: {type(e).__name__}: {str(e)}')
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 @app.route('/')
@@ -397,9 +426,20 @@ if __name__ == '__main__':
         logger.warning(f'PDF não encontrado em {PDF_PATH}. Crie o arquivo ou ajuste o caminho.')
     
     # Verificar configurações de e-mail
+    logger.info('=' * 50)
+    logger.info('Verificando configurações de e-mail...')
+    logger.info(f'SMTP_SERVER: {SMTP_SERVER}')
+    logger.info(f'SMTP_PORT: {SMTP_PORT}')
+    logger.info(f'SMTP_USER: {"✅ Configurado" if SMTP_USER else "❌ NÃO configurado"}')
+    logger.info(f'SMTP_PASSWORD: {"✅ Configurado" if SMTP_PASSWORD else "❌ NÃO configurado"}')
+    logger.info(f'OWNER_EMAIL: {OWNER_EMAIL if OWNER_EMAIL else "❌ NÃO configurado"}')
+    logger.info('=' * 50)
+    
     if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning('SMTP não configurado. E-mails não serão enviados.')
-        logger.info('Configure as variáveis de ambiente: SMTP_USER, SMTP_PASSWORD, OWNER_EMAIL')
+        logger.warning('⚠️ SMTP não configurado. E-mails não serão enviados.')
+        logger.info('Configure as variáveis de ambiente no Railway: SMTP_USER, SMTP_PASSWORD, OWNER_EMAIL')
+    else:
+        logger.info('✅ Configurações SMTP encontradas')
     
     logger.info('Servidor iniciando...')
     
