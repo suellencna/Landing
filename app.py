@@ -58,9 +58,18 @@ GUIDE_TITLE = os.getenv('GUIDE_TITLE', 'Guia Rápido: Principais Corretoras do B
 
 # Configurações Resend (API REST - alternativa ao SMTP)
 # Nota: Estas variáveis são opcionais e só são necessárias se USE_RESEND=true
-RESEND_API_KEY = os.getenv('RESEND_API_KEY', '') or ''
-RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', '') or SMTP_USER or ''
-USE_RESEND = os.getenv('USE_RESEND', 'false').lower() == 'true'  # Ativar Resend explicitamente
+# Usamos funções para acesso lazy e evitar problemas no build do Railway
+def get_resend_api_key():
+    """Obtém RESEND_API_KEY de forma lazy"""
+    return os.getenv('RESEND_API_KEY', '') or ''
+
+def get_resend_from_email():
+    """Obtém RESEND_FROM_EMAIL de forma lazy"""
+    return os.getenv('RESEND_FROM_EMAIL', '') or SMTP_USER or ''
+
+def get_use_resend():
+    """Obtém USE_RESEND de forma lazy"""
+    return os.getenv('USE_RESEND', 'false').lower() == 'true'
 
 # Configurações avançadas SMTP
 SMTP_TIMEOUT = int(os.getenv('SMTP_TIMEOUT', '60'))  # Timeout em segundos (padrão: 60)
@@ -158,11 +167,14 @@ def check_network_connectivity(host, port, timeout=5):
 
 def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
     """Envia e-mail usando o SDK oficial do Resend"""
-    if not RESEND_API_KEY:
+    resend_api_key = get_resend_api_key()
+    resend_from_email = get_resend_from_email()
+    
+    if not resend_api_key:
         logger.warning('RESEND_API_KEY não configurada. Pulando envio via Resend.')
         return False
     
-    if not RESEND_FROM_EMAIL:
+    if not resend_from_email:
         logger.warning('RESEND_FROM_EMAIL não configurada. Pulando envio via Resend.')
         return False
     
@@ -174,11 +186,11 @@ def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
     
     try:
         # Configurar API key
-        resend.api_key = RESEND_API_KEY
+        resend.api_key = resend_api_key
         
         # Preparar parâmetros do e-mail
         params = {
-            "from": RESEND_FROM_EMAIL,
+            "from": resend_from_email,
             "to": [to_email],
             "subject": subject,
             "text": body
@@ -224,7 +236,10 @@ def send_email(to_email, subject, body, pdf_path=None, name='', max_retries=3):
     Tenta Resend primeiro (se configurado), depois SMTP como fallback"""
     
     # Tentar Resend primeiro se estiver configurado
-    if USE_RESEND and RESEND_API_KEY:
+    use_resend = get_use_resend()
+    resend_api_key = get_resend_api_key()
+    
+    if use_resend and resend_api_key:
         logger.info('Resend configurado. Tentando enviar via API REST...')
         if send_email_resend(to_email, subject, body, pdf_path, name):
             return True
@@ -236,7 +251,7 @@ def send_email(to_email, subject, body, pdf_path=None, name='', max_retries=3):
         logger.warning('Credenciais SMTP não configuradas. E-mail não será enviado.')
         logger.warning(f'SMTP_USER: {"Configurado" if SMTP_USER else "NÃO configurado"}')
         logger.warning(f'SMTP_PASSWORD: {"Configurado" if SMTP_PASSWORD else "NÃO configurado"}')
-        if not USE_RESEND or not RESEND_API_KEY:
+        if not use_resend or not resend_api_key:
             logger.error('Nenhum método de envio configurado (nem Resend nem SMTP)')
         return False
     
@@ -660,9 +675,12 @@ if __name__ == '__main__':
     
     # Resend (API REST)
     logger.info('--- Resend (API REST) ---')
-    logger.info(f'USE_RESEND: {"✅ Ativado" if USE_RESEND else "❌ Desativado"}')
-    logger.info(f'RESEND_API_KEY: {"✅ Configurado" if RESEND_API_KEY else "❌ NÃO configurado"}')
-    logger.info(f'RESEND_FROM_EMAIL: {RESEND_FROM_EMAIL if RESEND_FROM_EMAIL else "❌ NÃO configurado"}')
+    use_resend = get_use_resend()
+    resend_api_key = get_resend_api_key()
+    resend_from_email = get_resend_from_email()
+    logger.info(f'USE_RESEND: {"✅ Ativado" if use_resend else "❌ Desativado"}')
+    logger.info(f'RESEND_API_KEY: {"✅ Configurado" if resend_api_key else "❌ NÃO configurado"}')
+    logger.info(f'RESEND_FROM_EMAIL: {resend_from_email if resend_from_email else "❌ NÃO configurado"}')
     
     # SMTP (Fallback)
     logger.info('--- SMTP (Fallback) ---')
@@ -676,7 +694,7 @@ if __name__ == '__main__':
     logger.info('=' * 50)
     
     # Verificar se há método de envio configurado
-    if USE_RESEND and RESEND_API_KEY:
+    if use_resend and resend_api_key:
         logger.info('✅ Resend configurado - usando API REST para envio de e-mails')
         if SMTP_USER and SMTP_PASSWORD:
             logger.info('✅ SMTP também configurado - será usado como fallback se Resend falhar')
