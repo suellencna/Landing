@@ -167,14 +167,41 @@ def send_email(to_email, subject, body, pdf_path=None, name=''):
         
         # Conectar e enviar
         logger.info('Conectando ao servidor SMTP...')
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
-        logger.info('Iniciando TLS...')
-        server.starttls()
-        logger.info('Fazendo login...')
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        logger.info('Login bem-sucedido. Enviando mensagem...')
-        server.send_message(msg)
-        server.quit()
+        
+        # Tentar porta 587 com TLS primeiro, se falhar tenta 465 com SSL
+        try:
+            if SMTP_PORT == 587:
+                # Tentar TLS na porta 587
+                logger.info(f'Tentando conexão TLS na porta {SMTP_PORT}...')
+                server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
+                logger.info('Iniciando TLS...')
+                server.starttls()
+            else:
+                # Usar SSL na porta 465
+                logger.info(f'Tentando conexão SSL na porta {SMTP_PORT}...')
+                server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=30)
+            
+            logger.info('Fazendo login...')
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            logger.info('Login bem-sucedido. Enviando mensagem...')
+            server.send_message(msg)
+            server.quit()
+        except (OSError, smtplib.SMTPException) as e:
+            # Se falhar na porta 587, tentar porta 465 com SSL
+            if SMTP_PORT == 587:
+                logger.warning(f'Falha na porta 587, tentando porta 465 com SSL...')
+                try:
+                    server = smtplib.SMTP_SSL(SMTP_SERVER, 465, timeout=30)
+                    logger.info('Conexão SSL estabelecida. Fazendo login...')
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                    logger.info('Login bem-sucedido. Enviando mensagem...')
+                    server.send_message(msg)
+                    server.quit()
+                except Exception as e2:
+                    logger.error(f'Erro ao tentar porta 465: {str(e2)}')
+                    raise e2
+            else:
+                raise
         
         logger.info(f'✅ E-mail enviado com sucesso para {to_email}')
         return True
