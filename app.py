@@ -18,7 +18,6 @@ from functools import wraps
 import logging
 import time
 import socket
-import requests
 import base64
 import ssl
 
@@ -32,6 +31,14 @@ except ImportError:
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Tentar importar Resend SDK (opcional)
+try:
+    import resend
+    RESEND_SDK_AVAILABLE = True
+except ImportError:
+    RESEND_SDK_AVAILABLE = False
+    logger.warning('SDK do Resend não instalado. Instale com: pip install resend')
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Permite requisições do frontend
@@ -148,7 +155,7 @@ def check_network_connectivity(host, port, timeout=5):
         return False
 
 def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
-    """Envia e-mail usando a API REST do Resend"""
+    """Envia e-mail usando o SDK oficial do Resend"""
     if not RESEND_API_KEY:
         logger.warning('RESEND_API_KEY não configurada. Pulando envio via Resend.')
         return False
@@ -157,59 +164,52 @@ def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
         logger.warning('RESEND_FROM_EMAIL não configurada. Pulando envio via Resend.')
         return False
     
+    if not RESEND_SDK_AVAILABLE:
+        logger.error('SDK do Resend não está instalado. Instale com: pip install resend')
+        return False
+    
     logger.info(f'Tentando enviar e-mail via Resend para {to_email}')
     
     try:
-        # Preparar dados do e-mail
-        email_data = {
-            'from': RESEND_FROM_EMAIL,
-            'to': [to_email],
-            'subject': subject,
-            'text': body
+        # Configurar API key
+        resend.api_key = RESEND_API_KEY
+        
+        # Preparar parâmetros do e-mail
+        params = {
+            "from": RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "text": body
         }
         
         # Adicionar anexo PDF se existir
-        attachments = []
         if pdf_path and os.path.exists(pdf_path):
             logger.info(f'Anexando PDF: {pdf_path}')
             try:
                 with open(pdf_path, 'rb') as f:
                     pdf_content = f.read()
                     pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-                    attachments.append({
-                        'filename': 'CORRETORAS - Investir é Realizar.pdf',
-                        'content': pdf_base64
-                    })
+                    params["attachments"] = [{
+                        "filename": "CORRETORAS - Investir é Realizar.pdf",
+                        "content": pdf_base64
+                    }]
                 logger.info('PDF preparado para anexo')
             except Exception as pdf_error:
                 logger.error(f'Erro ao preparar PDF: {str(pdf_error)}')
+                # Continua sem o PDF
         
-        if attachments:
-            email_data['attachments'] = attachments
+        # Enviar via SDK Resend
+        email = resend.Emails.send(params)
         
-        # Enviar via API Resend
-        headers = {
-            'Authorization': f'Bearer {RESEND_API_KEY}',
-            'Content-Type': 'application/json'
-        }
-        
-        response = requests.post(
-            'https://api.resend.com/emails',
-            json=email_data,
-            headers=headers,
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {result.get("id", "N/A")})')
+        if email and hasattr(email, 'id'):
+            logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email.id})')
             return True
         else:
-            logger.error(f'❌ Erro ao enviar e-mail via Resend: {response.status_code} - {response.text}')
+            logger.error(f'❌ Resposta inesperada do Resend: {email}')
             return False
             
-    except requests.exceptions.RequestException as e:
-        logger.error(f'❌ Erro de conexão ao enviar e-mail via Resend: {str(e)}')
+    except resend.ResendError as e:
+        logger.error(f'❌ Erro do Resend SDK: {str(e)}')
         return False
     except Exception as e:
         logger.error(f'❌ Erro inesperado ao enviar e-mail via Resend: {type(e).__name__}: {str(e)}')
