@@ -347,7 +347,7 @@ E-mail enviado: {'Sim' if email_sent else 'Não'}
 def download_pdf():
     """Endpoint para download do PDF"""
     if os.path.exists(PDF_PATH):
-        return send_file(PDF_PATH, as_attachment=True, download_name='guia-corretoras.pdf')
+        return send_file(PDF_PATH, as_attachment=True, download_name='CORRETORAS - Investir é Realizar.pdf')
     else:
         return jsonify({'error': 'PDF não encontrado'}), 404
 
