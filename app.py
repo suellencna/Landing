@@ -16,6 +16,8 @@ from email import encoders
 import re
 from functools import wraps
 import logging
+import time
+import socket
 
 # Tentar carregar python-dotenv (opcional)
 try:
@@ -123,8 +125,18 @@ def sanitize_input(text):
     text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', str(text))
     return text[:500]  # Limita a 500 caracteres
 
-def send_email(to_email, subject, body, pdf_path=None, name=''):
-    """Envia e-mail com PDF anexado"""
+def check_network_connectivity(host, port, timeout=5):
+    """Verifica se é possível conectar ao host:porta"""
+    try:
+        sock = socket.create_connection((host, port), timeout=timeout)
+        sock.close()
+        return True
+    except (OSError, socket.gaierror, socket.timeout) as e:
+        logger.warning(f'Não foi possível conectar a {host}:{port} - {str(e)}')
+        return False
+
+def send_email(to_email, subject, body, pdf_path=None, name='', max_retries=3):
+    """Envia e-mail com PDF anexado com retry automático"""
     # Verificar credenciais
     if not SMTP_USER or not SMTP_PASSWORD:
         logger.warning('Credenciais SMTP não configuradas. E-mail não será enviado.')
@@ -135,6 +147,17 @@ def send_email(to_email, subject, body, pdf_path=None, name=''):
     logger.info(f'Tentando enviar e-mail para {to_email}')
     logger.info(f'SMTP Server: {SMTP_SERVER}:{SMTP_PORT}')
     logger.info(f'SMTP User: {SMTP_USER}')
+    
+    # Verificar conectividade de rede primeiro
+    logger.info('Verificando conectividade de rede...')
+    if not check_network_connectivity(SMTP_SERVER, SMTP_PORT):
+        logger.error(f'❌ Não foi possível conectar ao servidor SMTP {SMTP_SERVER}:{SMTP_PORT}')
+        logger.error('Possíveis causas:')
+        logger.error('1. O container não tem acesso à internet')
+        logger.error('2. O provedor de hospedagem está bloqueando conexões SMTP')
+        logger.error('3. Problemas de DNS ou firewall')
+        logger.error('Sugestão: Considere usar um serviço de e-mail com API REST (SendGrid, Resend, Mailgun)')
+        return False
     
     try:
         msg = MIMEMultipart()
@@ -165,55 +188,98 @@ def send_email(to_email, subject, body, pdf_path=None, name=''):
             else:
                 logger.warning(f'PDF não encontrado: {pdf_path}')
         
-        # Conectar e enviar
-        logger.info('Conectando ao servidor SMTP...')
+        # Tentar enviar com retry
+        last_error = None
+        ports_to_try = [SMTP_PORT]
         
-        # Tentar porta 587 com TLS primeiro, se falhar tenta 465 com SSL
-        try:
-            if SMTP_PORT == 587:
-                # Tentar TLS na porta 587
-                logger.info(f'Tentando conexão TLS na porta {SMTP_PORT}...')
-                server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
-                logger.info('Iniciando TLS...')
-                server.starttls()
-            else:
-                # Usar SSL na porta 465
-                logger.info(f'Tentando conexão SSL na porta {SMTP_PORT}...')
-                server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=30)
-            
-            logger.info('Fazendo login...')
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            logger.info('Login bem-sucedido. Enviando mensagem...')
-            server.send_message(msg)
-            server.quit()
-        except (OSError, smtplib.SMTPException) as e:
-            # Se falhar na porta 587, tentar porta 465 com SSL
-            if SMTP_PORT == 587:
-                logger.warning(f'Falha na porta 587, tentando porta 465 com SSL...')
+        # Se porta padrão é 587, adicionar 465 como fallback
+        if SMTP_PORT == 587:
+            ports_to_try.append(465)
+        elif SMTP_PORT == 465:
+            ports_to_try.append(587)
+        
+        for attempt in range(max_retries):
+            for port in ports_to_try:
                 try:
-                    server = smtplib.SMTP_SSL(SMTP_SERVER, 465, timeout=30)
-                    logger.info('Conexão SSL estabelecida. Fazendo login...')
+                    logger.info(f'Tentativa {attempt + 1}/{max_retries} - Conectando ao servidor SMTP na porta {port}...')
+                    
+                    if port == 587:
+                        # Tentar TLS na porta 587
+                        logger.info(f'Tentando conexão TLS na porta {port}...')
+                        server = smtplib.SMTP(SMTP_SERVER, port, timeout=30)
+                        logger.info('Iniciando TLS...')
+                        server.starttls()
+                    else:
+                        # Usar SSL na porta 465
+                        logger.info(f'Tentando conexão SSL na porta {port}...')
+                        server = smtplib.SMTP_SSL(SMTP_SERVER, port, timeout=30)
+                    
+                    logger.info('Fazendo login...')
                     server.login(SMTP_USER, SMTP_PASSWORD)
                     logger.info('Login bem-sucedido. Enviando mensagem...')
                     server.send_message(msg)
                     server.quit()
-                except Exception as e2:
-                    logger.error(f'Erro ao tentar porta 465: {str(e2)}')
-                    raise e2
-            else:
-                raise
+                    
+                    logger.info(f'✅ E-mail enviado com sucesso para {to_email}')
+                    return True
+                    
+                except (OSError, socket.gaierror, socket.timeout) as e:
+                    last_error = e
+                    error_msg = str(e)
+                    logger.warning(f'Erro de rede na porta {port}: {error_msg}')
+                    
+                    # Se for erro de rede, não tentar outras portas nesta tentativa
+                    if 'Network is unreachable' in error_msg or 'Connection refused' in error_msg or 'timed out' in error_msg.lower():
+                        logger.error(f'❌ Erro de conectividade: {error_msg}')
+                        logger.error('O container não consegue acessar o servidor SMTP.')
+                        logger.error('Isso geralmente indica que o provedor de hospedagem está bloqueando conexões SMTP.')
+                        if attempt < max_retries - 1:
+                            wait_time = (2 ** attempt) * 2  # Backoff exponencial: 2s, 4s, 8s
+                            logger.info(f'Aguardando {wait_time} segundos antes de tentar novamente...')
+                            time.sleep(wait_time)
+                        break
+                    
+                except smtplib.SMTPAuthenticationError as e:
+                    logger.error(f'❌ Erro de autenticação SMTP: {str(e)}')
+                    logger.error('Verifique: 1) Senha de app está correta? 2) Verificação em duas etapas está ativada?')
+                    return False
+                    
+                except smtplib.SMTPException as e:
+                    last_error = e
+                    logger.warning(f'Erro SMTP na porta {port}: {str(e)}')
+                    # Tenta próxima porta
+                    continue
+            
+            # Se chegou aqui e não teve sucesso, aguarda antes de próxima tentativa
+            if attempt < max_retries - 1:
+                wait_time = (2 ** attempt) * 2
+                logger.info(f'Aguardando {wait_time} segundos antes da próxima tentativa...')
+                time.sleep(wait_time)
         
-        logger.info(f'✅ E-mail enviado com sucesso para {to_email}')
-        return True
-    except smtplib.SMTPAuthenticationError as e:
-        logger.error(f'❌ Erro de autenticação SMTP: {str(e)}')
-        logger.error('Verifique: 1) Senha de app está correta? 2) Verificação em duas etapas está ativada?')
+        # Se todas as tentativas falharam
+        if last_error:
+            logger.error(f'❌ Falha ao enviar e-mail após {max_retries} tentativas')
+            logger.error(f'Último erro: {type(last_error).__name__}: {str(last_error)}')
+            if isinstance(last_error, (OSError, socket.gaierror, socket.timeout)):
+                logger.error('')
+                logger.error('=' * 60)
+                logger.error('PROBLEMA DE CONECTIVIDADE DETECTADO')
+                logger.error('=' * 60)
+                logger.error('O container não consegue conectar ao servidor SMTP do Gmail.')
+                logger.error('')
+                logger.error('SOLUÇÕES RECOMENDADAS:')
+                logger.error('')
+                logger.error('1. Verifique as configurações de rede do seu provedor de hospedagem')
+                logger.error('2. Considere usar um serviço de e-mail com API REST:')
+                logger.error('   - SendGrid (gratuito: 100 e-mails/dia)')
+                logger.error('   - Resend (gratuito: 3.000 e-mails/mês)')
+                logger.error('   - Mailgun (gratuito: 5.000 e-mails/mês)')
+                logger.error('3. Verifique se há firewall ou proxy bloqueando conexões SMTP')
+                logger.error('=' * 60)
         return False
-    except smtplib.SMTPException as e:
-        logger.error(f'❌ Erro SMTP: {str(e)}')
-        return False
+        
     except Exception as e:
-        logger.error(f'❌ Erro ao enviar e-mail: {type(e).__name__}: {str(e)}')
+        logger.error(f'❌ Erro inesperado ao enviar e-mail: {type(e).__name__}: {str(e)}')
         import traceback
         logger.error(traceback.format_exc())
         return False
