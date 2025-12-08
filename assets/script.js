@@ -1,5 +1,6 @@
-// Configuração da API (será ajustada quando o backend estiver rodando)
-const API_URL = 'http://localhost:5000/api';
+// Configuração da API
+// Usa URL relativa para funcionar tanto localmente quanto em produção
+const API_URL = window.location.origin + '/api';
 
 // Elementos do formulário
 const form = document.getElementById('leadForm');
