@@ -227,20 +227,38 @@ def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
                 # Continua sem o PDF
         
         # Enviar via SDK Resend
+        logger.info('Enviando e-mail via API Resend...')
         email = resend.Emails.send(params)
         
-        if email and hasattr(email, 'id'):
-            logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email.id})')
-            return True
-        else:
-            logger.error(f'❌ Resposta inesperada do Resend: {email}')
-            return False
-            
-    except resend.ResendError as e:
-        logger.error(f'❌ Erro do Resend SDK: {str(e)}')
+        logger.info(f'Resposta do Resend: {email}')
+        
+        # Verificar resposta
+        if email:
+            # O Resend retorna um objeto com 'id' ou um dicionário
+            if isinstance(email, dict):
+                email_id = email.get('id', 'N/A')
+                if email_id != 'N/A':
+                    logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email_id})')
+                    return True
+            elif hasattr(email, 'id'):
+                logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email.id})')
+                return True
+            else:
+                # Tentar acessar como atributo
+                try:
+                    email_id = email.id if hasattr(email, 'id') else str(email)
+                    logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email_id})')
+                    return True
+                except:
+                    pass
+        
+        logger.error(f'❌ Resposta inesperada do Resend: {email}')
         return False
+            
     except Exception as e:
-        logger.error(f'❌ Erro inesperado ao enviar e-mail via Resend: {type(e).__name__}: {str(e)}')
+        error_type = type(e).__name__
+        error_msg = str(e)
+        logger.error(f'❌ Erro ao enviar e-mail via Resend: {error_type}: {error_msg}')
         import traceback
         logger.error(traceback.format_exc())
         return False
