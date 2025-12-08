@@ -56,8 +56,9 @@ SITE_NAME = os.getenv('SITE_NAME', 'Investir é Realizar')
 GUIDE_TITLE = os.getenv('GUIDE_TITLE', 'Guia Rápido: Principais Corretoras do Brasil')
 
 # Configurações Resend (API REST - alternativa ao SMTP)
-RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
-RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', SMTP_USER)  # Usa SMTP_USER como padrão
+# Nota: Estas variáveis são opcionais e só são necessárias se USE_RESEND=true
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '') or ''
+RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', '') or SMTP_USER or ''
 USE_RESEND = os.getenv('USE_RESEND', 'false').lower() == 'true'  # Ativar Resend explicitamente
 
 # Configurações avançadas SMTP
