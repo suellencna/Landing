@@ -249,6 +249,96 @@ ADMIN_HTML = '''
             font-size: 13px;
             line-height: 1.6;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+        .close {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .close:hover {
+            opacity: 0.7;
+        }
+        .modal-body {
+            padding: 30px;
+        }
+        .template-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: #666;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .preview-frame {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+        }
     </style>
 </head>
 <body>
@@ -289,6 +379,55 @@ ADMIN_HTML = '''
     
     <div class="copy-notification" id="copyNotification">
         ✅ Copiado para a área de transferência!
+    </div>
+    
+    <!-- Modal para Template de E-mail -->
+    <div id="emailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📧 Template de E-mail</h2>
+                <span class="close" onclick="closeEmailModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="template-tabs">
+                    <button class="tab-btn active" onclick="switchTab('preview')">👁️ Visualizar</button>
+                    <button class="tab-btn" onclick="switchTab('html')">📝 HTML</button>
+                    <button class="tab-btn" onclick="switchTab('text')">📄 Texto</button>
+                </div>
+                
+                <div id="preview-tab" class="tab-content active">
+                    <p style="color: #666; margin-bottom: 15px;">Visualização do e-mail:</p>
+                    <iframe id="previewFrame" class="preview-frame" srcdoc=""></iframe>
+                </div>
+                
+                <div id="html-tab" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <p style="color: #666; margin: 0;">Código HTML (cole no Gmail usando "Inserir HTML"):</p>
+                        <button class="btn btn-primary" onclick="copyHTML()">📋 Copiar HTML</button>
+                    </div>
+                    <pre class="code-block" id="htmlCode"></pre>
+                </div>
+                
+                <div id="text-tab" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <p style="color: #666; margin: 0;">Versão texto simples:</p>
+                        <button class="btn btn-primary" onclick="copyText()">📋 Copiar Texto</button>
+                    </div>
+                    <pre class="code-block" id="textCode"></pre>
+                </div>
+                
+                <div style="margin-top: 30px; padding: 20px; background: #e7f3ff; border-radius: 6px; border-left: 4px solid #2196F3;">
+                    <p style="margin: 0 0 10px; font-weight: 600; color: #1976D2;">💡 Como usar no Gmail:</p>
+                    <ol style="margin: 0; padding-left: 20px; color: #666;">
+                        <li>Copie o HTML da aba "📝 HTML"</li>
+                        <li>No Gmail, clique nos três pontos (⋮) → "Inserir HTML"</li>
+                        <li>Cole o HTML copiado</li>
+                        <li>Adicione o PDF como anexo</li>
+                        <li>Envie o e-mail</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -366,10 +505,10 @@ ADMIN_HTML = '''
                 html += '<td>';
                 
                 if (!lead.email_sent) {
-                    html += `<button class="btn btn-primary" onclick="copyLeadInfo(${lead.id})">📋 Copiar Info</button>`;
+                    html += `<button class="btn btn-primary" onclick="showEmailTemplate(${lead.id})">📧 Ver Template</button>`;
                     html += `<button class="btn btn-success" onclick="markAsSent(${lead.id})">✅ Marcar Enviado</button>`;
                 } else {
-                    html += `<button class="btn btn-secondary" onclick="copyLeadInfo(${lead.id})">📋 Copiar Info</button>`;
+                    html += `<button class="btn btn-secondary" onclick="showEmailTemplate(${lead.id})">📧 Ver Template</button>`;
                 }
                 
                 html += '</td></tr>';
@@ -379,11 +518,153 @@ ADMIN_HTML = '''
             container.innerHTML = html;
         }
         
-        function copyLeadInfo(leadId) {
+        let currentLeadEmail = '';
+        let currentEmailHTML = '';
+        let currentEmailText = '';
+        
+        function showEmailTemplate(leadId) {
             const lead = allLeads.find(l => l.id === leadId);
             if (!lead) return;
             
-            const emailBody = `Oi, ${lead.name}!
+            currentLeadEmail = lead.email;
+            
+            // Gerar HTML do e-mail
+            currentEmailHTML = generateEmailHTML(lead);
+            currentEmailText = generateEmailText(lead);
+            
+            // Mostrar preview
+            document.getElementById('previewFrame').srcdoc = currentEmailHTML;
+            document.getElementById('htmlCode').textContent = currentEmailHTML;
+            document.getElementById('textCode').textContent = \`Para: ${lead.email}
+Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
+
+\${currentEmailText}\`;
+            
+            // Mostrar modal
+            document.getElementById('emailModal').style.display = 'block';
+        }
+        
+        function closeEmailModal() {
+            document.getElementById('emailModal').style.display = 'none';
+        }
+        
+        function switchTab(tabName) {
+            // Esconder todas as tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Mostrar tab selecionada
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        function copyHTML() {
+            navigator.clipboard.writeText(currentEmailHTML).then(() => {
+                showNotification();
+            });
+        }
+        
+        function copyText() {
+            const textToCopy = \`Para: \${currentLeadEmail}
+Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
+
+\${currentEmailText}\`;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showNotification();
+            });
+        }
+        
+        function generateEmailHTML(lead) {
+            return \`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seu PDF: Guia Rápido: Principais Corretoras do Brasil</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <!-- Header com Logo -->
+                    <tr>
+                        <td align="center" style="padding: 40px 30px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            <div style="color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: 1px;">
+                                💰 Investir é Realizar
+                            </div>
+                            <!-- SUBSTITUA ACIMA PELO SEU LOGO: <img src="URL_DO_SEU_LOGO" alt="Investir é Realizar" style="max-width: 200px; height: auto; display: block;" /> -->
+                        </td>
+                    </tr>
+                    
+                    <!-- Conteúdo Principal -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h1 style="margin: 0 0 20px; color: #333333; font-size: 24px; font-weight: 600; line-height: 1.4;">
+                                Olá, ${lead.name}! 👋
+                            </h1>
+                            
+                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
+                                Obrigado por se cadastrar! Segue o seu <strong style="color: #667eea;">PDF gratuito</strong> que você solicitou:
+                            </p>
+                            
+                            <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #333333; font-size: 18px; font-weight: 600;">
+                                    📄 Guia Rápido: Principais Corretoras do Brasil
+                                </p>
+                            </div>
+                            
+                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
+                                O PDF está anexado a este e-mail. Você também pode baixá-lo diretamente pelo link abaixo:
+                            </p>
+                            
+                            <!-- Botão de Download -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 20px 0;">
+                                        <a href="https://web-production-4df5e.up.railway.app/api/download-pdf" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                                            📥 Baixar PDF Agora
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 30px 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
+                                Bons estudos e sucesso nos seus investimentos! 💰
+                            </p>
+                            
+                            <p style="margin: 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                                Atenciosamente,<br>
+                                <strong style="color: #667eea;">Equipe Investir é Realizar</strong>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; border-top: 1px solid #e9ecef;">
+                            <p style="margin: 0 0 10px; color: #999999; font-size: 12px; line-height: 1.5; text-align: center;">
+                                Este e-mail foi enviado automaticamente. Por favor, não responda.
+                            </p>
+                            <p style="margin: 0; color: #999999; font-size: 12px; line-height: 1.5; text-align: center;">
+                                © ${new Date().getFullYear()} Investir é Realizar. Todos os direitos reservados.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>\`;
+        }
+        
+        function generateEmailText(lead) {
+            return \`Oi, ${lead.name}!
 
 Segue o seu PDF gratuito: Guia Rápido: Principais Corretoras do Brasil.
 
@@ -393,12 +674,114 @@ Bons estudos!
 Investir é Realizar
 
 ---
-Este e-mail foi enviado automaticamente. Por favor, não responda.`;
+Este e-mail foi enviado automaticamente. Por favor, não responda.\`;
+        }
+        
+        function copyLeadInfo(leadId) {
+            const lead = allLeads.find(l => l.id === leadId);
+            if (!lead) return;
             
-            const textToCopy = `Para: ${lead.email}
+            const emailHTML = \`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seu PDF: Guia Rápido: Principais Corretoras do Brasil</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <!-- Header com Logo -->
+                    <tr>
+                        <td align="center" style="padding: 40px 30px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            <img src="https://via.placeholder.com/200x60/ffffff/667eea?text=Investir+é+Realizar" alt="Investir é Realizar" style="max-width: 200px; height: auto; display: block;" />
+                            <!-- SUBSTITUA O LINK ACIMA PELO LINK DO SEU LOGO REAL -->
+                        </td>
+                    </tr>
+                    
+                    <!-- Conteúdo Principal -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h1 style="margin: 0 0 20px; color: #333333; font-size: 24px; font-weight: 600; line-height: 1.4;">
+                                Olá, ${lead.name}! 👋
+                            </h1>
+                            
+                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
+                                Obrigado por se cadastrar! Segue o seu <strong>PDF gratuito</strong> que você solicitou:
+                            </p>
+                            
+                            <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #333333; font-size: 18px; font-weight: 600;">
+                                    📄 Guia Rápido: Principais Corretoras do Brasil
+                                </p>
+                            </div>
+                            
+                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
+                                O PDF está anexado a este e-mail. Você também pode baixá-lo diretamente pelo link abaixo:
+                            </p>
+                            
+                            <!-- Botão de Download -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 20px 0;">
+                                        <a href="https://web-production-4df5e.up.railway.app/api/download-pdf" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                                            📥 Baixar PDF Agora
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 30px 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
+                                Bons estudos e sucesso nos seus investimentos! 💰
+                            </p>
+                            
+                            <p style="margin: 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                                Atenciosamente,<br>
+                                <strong style="color: #667eea;">Equipe Investir é Realizar</strong>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; border-top: 1px solid #e9ecef;">
+                            <p style="margin: 0 0 10px; color: #999999; font-size: 12px; line-height: 1.5; text-align: center;">
+                                Este e-mail foi enviado automaticamente. Por favor, não responda.
+                            </p>
+                            <p style="margin: 0; color: #999999; font-size: 12px; line-height: 1.5; text-align: center;">
+                                © ${new Date().getFullYear()} Investir é Realizar. Todos os direitos reservados.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>\`;
+            
+            const textToCopy = \`Para: ${lead.email}
 Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
 
-${emailBody}`;
+--- COLE O HTML ABAIXO NO GMAIL (use "Inserir HTML" ou cole no modo HTML) ---
+
+${emailHTML}
+
+--- OU USE O TEXTO SIMPLES ABAIXO ---
+
+Oi, ${lead.name}!
+
+Segue o seu PDF gratuito: Guia Rápido: Principais Corretoras do Brasil.
+
+Você pode baixar pelo link direto ou usar o arquivo anexado a este e-mail.
+
+Bons estudos!
+Investir é Realizar
+
+---
+Este e-mail foi enviado automaticamente. Por favor, não responda.\`;
             
             navigator.clipboard.writeText(textToCopy).then(() => {
                 showNotification();
@@ -437,6 +820,14 @@ ${emailBody}`;
             setTimeout(() => {
                 notification.style.display = 'none';
             }, 2000);
+        }
+        
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('emailModal');
+            if (event.target == modal) {
+                closeEmailModal();
+            }
         }
         
         // Carregar leads ao iniciar
