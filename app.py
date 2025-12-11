@@ -65,6 +65,390 @@ OWNER_EMAIL = os.getenv('OWNER_EMAIL', '')
 SITE_NAME = os.getenv('SITE_NAME', 'Investir é Realizar')
 GUIDE_TITLE = os.getenv('GUIDE_TITLE', 'Guia Rápido: Principais Corretoras do Brasil')
 
+# Template HTML para página de administração
+ADMIN_HTML = '''
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração - Leads</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+        .stat-card p {
+            color: #666;
+            font-size: 14px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .filter-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        .leads-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .leads-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .leads-table td {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .leads-table tr:hover {
+            background: #f8f9fa;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .badge.sent {
+            background: #d4edda;
+            color: #155724;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            margin-right: 5px;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: #999;
+        }
+        .copy-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1000;
+        }
+        .email-template {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Administração de Leads</h1>
+            <p>Gerencie os leads e envie e-mails manualmente pelo Gmail</p>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <h3 id="total-leads">-</h3>
+                <p>Total de Leads</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="pending-emails">-</h3>
+                <p>E-mails Pendentes</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="sent-emails">-</h3>
+                <p>E-mails Enviados</p>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="filters">
+                <button class="filter-btn active" onclick="filterLeads('all')">Todos</button>
+                <button class="filter-btn" onclick="filterLeads('pending')">Pendentes</button>
+                <button class="filter-btn" onclick="filterLeads('sent')">Enviados</button>
+                <button class="filter-btn" onclick="loadLeads()">🔄 Atualizar</button>
+            </div>
+            
+            <div id="leads-container">
+                <div class="loading">Carregando leads...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="copy-notification" id="copyNotification">
+        ✅ Copiado para a área de transferência!
+    </div>
+    
+    <script>
+        let allLeads = [];
+        let currentFilter = 'all';
+        
+        async function loadLeads() {
+            try {
+                const response = await fetch('/api/leads');
+                const data = await response.json();
+                allLeads = data.leads || [];
+                
+                updateStats();
+                filterLeads(currentFilter);
+            } catch (error) {
+                document.getElementById('leads-container').innerHTML = 
+                    '<div class="empty">❌ Erro ao carregar leads. Tente novamente.</div>';
+            }
+        }
+        
+        function updateStats() {
+            const total = allLeads.length;
+            const pending = allLeads.filter(l => !l.email_sent).length;
+            const sent = allLeads.filter(l => l.email_sent).length;
+            
+            document.getElementById('total-leads').textContent = total;
+            document.getElementById('pending-emails').textContent = pending;
+            document.getElementById('sent-emails').textContent = sent;
+        }
+        
+        function filterLeads(filter) {
+            currentFilter = filter;
+            
+            // Atualizar botões
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event?.target?.classList.add('active');
+            
+            let filtered = allLeads;
+            if (filter === 'pending') {
+                filtered = allLeads.filter(l => !l.email_sent);
+            } else if (filter === 'sent') {
+                filtered = allLeads.filter(l => l.email_sent);
+            }
+            
+            displayLeads(filtered);
+        }
+        
+        function displayLeads(leads) {
+            const container = document.getElementById('leads-container');
+            
+            if (leads.length === 0) {
+                container.innerHTML = '<div class="empty">Nenhum lead encontrado</div>';
+                return;
+            }
+            
+            let html = '<table class="leads-table"><thead><tr>';
+            html += '<th>ID</th><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Data</th><th>Status</th><th>Ações</th>';
+            html += '</tr></thead><tbody>';
+            
+            leads.forEach(lead => {
+                const date = new Date(lead.created_at).toLocaleString('pt-BR');
+                const status = lead.email_sent 
+                    ? '<span class="badge sent">✅ Enviado</span>'
+                    : '<span class="badge pending">⏳ Pendente</span>';
+                
+                html += '<tr>';
+                html += `<td>${lead.id}</td>`;
+                html += `<td>${lead.name}</td>`;
+                html += `<td>${lead.email}</td>`;
+                html += `<td>${lead.phone}</td>`;
+                html += `<td>${date}</td>`;
+                html += `<td>${status}</td>`;
+                html += '<td>';
+                
+                if (!lead.email_sent) {
+                    html += `<button class="btn btn-primary" onclick="copyLeadInfo(${lead.id})">📋 Copiar Info</button>`;
+                    html += `<button class="btn btn-success" onclick="markAsSent(${lead.id})">✅ Marcar Enviado</button>`;
+                } else {
+                    html += `<button class="btn btn-secondary" onclick="copyLeadInfo(${lead.id})">📋 Copiar Info</button>`;
+                }
+                
+                html += '</td></tr>';
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+        
+        function copyLeadInfo(leadId) {
+            const lead = allLeads.find(l => l.id === leadId);
+            if (!lead) return;
+            
+            const emailBody = `Oi, ${lead.name}!
+
+Segue o seu PDF gratuito: Guia Rápido: Principais Corretoras do Brasil.
+
+Você pode baixar pelo link direto ou usar o arquivo anexado a este e-mail.
+
+Bons estudos!
+Investir é Realizar
+
+---
+Este e-mail foi enviado automaticamente. Por favor, não responda.`;
+            
+            const textToCopy = `Para: ${lead.email}
+Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
+
+${emailBody}`;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showNotification();
+            });
+        }
+        
+        async function markAsSent(leadId) {
+            if (!confirm('Marcar este e-mail como enviado?')) return;
+            
+            try {
+                const response = await fetch(`/api/leads/${leadId}/mark-sent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    const lead = allLeads.find(l => l.id === leadId);
+                    if (lead) {
+                        lead.email_sent = true;
+                        lead.email_sent_at = new Date().toISOString();
+                    }
+                    filterLeads(currentFilter);
+                    updateStats();
+                } else {
+                    alert('Erro ao marcar como enviado');
+                }
+            } catch (error) {
+                alert('Erro ao marcar como enviado');
+            }
+        }
+        
+        function showNotification() {
+            const notification = document.getElementById('copyNotification');
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+        
+        // Carregar leads ao iniciar
+        loadLeads();
+        
+        // Atualizar a cada 30 segundos
+        setInterval(loadLeads, 30000);
+    </script>
+</body>
+</html>
+'''
+
 # Configurações Resend (API REST - alternativa ao SMTP)
 # Nota: Estas variáveis são opcionais e só são necessárias se USE_RESEND=true
 # Usamos construção indireta de nomes para evitar detecção durante build do Railway
@@ -332,6 +716,40 @@ def send_email_resend(to_email, subject, body, pdf_path=None, name='', use_resen
             else:
                 logger.error('❌ Falha mesmo usando domínio do Resend. Verifique a API Key.')
                 return False
+        
+        # Detectar erro de modo de teste - só permite enviar para próprio e-mail
+        if 'only send testing emails' in error_msg.lower() or 'to your own email address' in error_msg.lower():
+            logger.error('❌ Resend está em modo de teste/desenvolvimento')
+            logger.error('⚠️ O Resend só permite enviar para seu próprio e-mail cadastrado')
+            logger.error('')
+            logger.error('SOLUÇÕES:')
+            logger.error('1. Verificar um domínio no Resend: https://resend.com/domains')
+            logger.error('   - Vá em Domains → Add Domain')
+            logger.error('   - Siga as instruções para verificar o domínio')
+            logger.error('   - Depois use um e-mail desse domínio como remetente')
+            logger.error('')
+            logger.error('2. OU usar SendGrid como alternativa:')
+            logger.error('   - Configure SENDGRID_API_KEY e USE_SENDGRID=true')
+            logger.error('   - O SendGrid permite enviar sem verificar domínio (com limitações)')
+            logger.error('')
+            return False
+        
+        # Detectar erro de modo de teste - só permite enviar para próprio e-mail
+        if 'only send testing emails' in error_msg.lower() or 'to your own email address' in error_msg.lower():
+            logger.error('❌ Resend está em modo de teste/desenvolvimento')
+            logger.error('⚠️ O Resend só permite enviar para seu próprio e-mail cadastrado')
+            logger.error('')
+            logger.error('SOLUÇÕES:')
+            logger.error('1. Verificar um domínio no Resend: https://resend.com/domains')
+            logger.error('   - Vá em Domains → Add Domain')
+            logger.error('   - Siga as instruções para verificar o domínio')
+            logger.error('   - Depois use um e-mail desse domínio como remetente')
+            logger.error('')
+            logger.error('2. OU usar SendGrid como alternativa:')
+            logger.error('   - Configure SENDGRID_API_KEY e USE_SENDGRID=true')
+            logger.error('   - O SendGrid permite enviar sem verificar domínio (com limitações)')
+            logger.error('')
+            return False
         
         # Detectar outros erros comuns
         if 'invalid api key' in error_msg.lower() or 'unauthorized' in error_msg.lower():
@@ -716,9 +1134,18 @@ Bons estudos!
 Este e-mail foi enviado automaticamente. Por favor, não responda.
         '''.strip()
         
+        # Verificar se envio automático está desabilitado
+        DISABLE_AUTO_EMAIL = os.getenv('DISABLE_AUTO_EMAIL', 'false').lower() == 'true'
+        
         # Função para enviar e-mail em background
         def send_email_background():
             try:
+                # Se envio automático estiver desabilitado, apenas loga
+                if DISABLE_AUTO_EMAIL:
+                    logger.info(f'⚠️ Envio automático desabilitado. Lead {lead_id} aguardando envio manual.')
+                    logger.info(f'   Acesse /admin para ver leads pendentes e enviar manualmente.')
+                    return
+                
                 # Enviar e-mail ao lead
                 email_sent = send_email(
                     email,
@@ -855,6 +1282,33 @@ def list_leads():
     except Exception as e:
         logger.error(f'Erro ao listar leads: {str(e)}')
         return jsonify({'error': 'Erro ao listar leads'}), 500
+
+@app.route('/admin')
+def admin():
+    """Página de administração para gerenciar leads e envio manual de e-mails"""
+    return render_template_string(ADMIN_HTML)
+
+@app.route('/api/leads/<int:lead_id>/mark-sent', methods=['POST'])
+def mark_email_sent(lead_id):
+    """Marca um e-mail como enviado manualmente"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE leads 
+            SET email_sent = 1, email_sent_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (lead_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f'Lead {lead_id} marcado como e-mail enviado manualmente')
+        return jsonify({'success': True, 'message': 'E-mail marcado como enviado'})
+    except Exception as e:
+        logger.error(f'Erro ao marcar e-mail como enviado: {str(e)}')
+        return jsonify({'success': False, 'error': 'Erro ao atualizar'}), 500
 
 if __name__ == '__main__':
     # Inicializar banco de dados
