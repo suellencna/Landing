@@ -1737,6 +1737,14 @@ if __name__ == '__main__':
     logger.info(f'SMTP_USER: {"✅ Configurado" if SMTP_USER else "❌ NÃO configurado"}')
     logger.info(f'SMTP_PASSWORD: {"✅ Configurado" if SMTP_PASSWORD else "❌ NÃO configurado"}')
     logger.info(f'OWNER_EMAIL: {OWNER_EMAIL if OWNER_EMAIL else "❌ NÃO configurado"}')
+    
+    # Verificar envio automático
+    disable_auto_email = os.getenv('DISABLE_AUTO_EMAIL', 'false').lower() == 'true'
+    logger.info('--- Configuração de Envio ---')
+    logger.info(f'DISABLE_AUTO_EMAIL: {"✅ Desabilitado (envio manual)" if disable_auto_email else "❌ Habilitado (envio automático)"}')
+    if disable_auto_email:
+        logger.info('   → E-mails NÃO serão enviados automaticamente')
+        logger.info('   → Acesse /ldir26 para enviar e-mails manualmente')
     logger.info('=' * 50)
     
     # Verificar se há método de envio configurado
