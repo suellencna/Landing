@@ -556,10 +556,10 @@ ADMIN_HTML = '''
             // Mostrar preview
             document.getElementById('previewFrame').srcdoc = currentEmailHTML;
             document.getElementById('htmlCode').textContent = currentEmailHTML;
-            document.getElementById('textCode').textContent = \`Para: ${lead.email}
+            document.getElementById('textCode').textContent = `Para: ${lead.email}
 Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
 
-\${currentEmailText}\`;
+${currentEmailText}`;
             
             // Mostrar modal
             document.getElementById('emailModal').style.display = 'block';
@@ -590,17 +590,17 @@ Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
         }
         
         function copyText() {
-            const textToCopy = \`Para: \${currentLeadEmail}
+            const textToCopy = `Para: ${currentLeadEmail}
 Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
 
-\${currentEmailText}\`;
+${currentEmailText}`;
             navigator.clipboard.writeText(textToCopy).then(() => {
                 showNotification();
             });
         }
         
         function generateEmailHTML(lead) {
-            return \`<!DOCTYPE html>
+            return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -678,11 +678,11 @@ Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
         </tr>
     </table>
 </body>
-</html>\`;
+</html>`;
         }
         
         function generateEmailText(lead) {
-            return \`Oi, ${lead.name}!
+            return `Oi, ${lead.name}!
 
 Segue o seu PDF gratuito: Guia Rápido: Principais Corretoras do Brasil.
 
@@ -692,14 +692,14 @@ Bons estudos!
 Investir é Realizar
 
 ---
-Este e-mail foi enviado automaticamente. Por favor, não responda.\`;
+Este e-mail foi enviado automaticamente. Por favor, não responda.`;
         }
         
         function copyLeadInfo(leadId) {
             const lead = allLeads.find(l => l.id === leadId);
             if (!lead) return;
             
-            const emailHTML = \`<!DOCTYPE html>
+            const emailHTML = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -778,9 +778,9 @@ Este e-mail foi enviado automaticamente. Por favor, não responda.\`;
         </tr>
     </table>
 </body>
-</html>\`;
+</html>`;
             
-            const textToCopy = \`Para: ${lead.email}
+            const textToCopy = `Para: ${lead.email}
 Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
 
 --- COLE O HTML ABAIXO NO GMAIL (use "Inserir HTML" ou cole no modo HTML) ---
@@ -799,7 +799,7 @@ Bons estudos!
 Investir é Realizar
 
 ---
-Este e-mail foi enviado automaticamente. Por favor, não responda.\`;
+Este e-mail foi enviado automaticamente. Por favor, não responda.`;
             
             navigator.clipboard.writeText(textToCopy).then(() => {
                 showNotification();
