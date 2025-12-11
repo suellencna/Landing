@@ -435,15 +435,20 @@ ADMIN_HTML = '''
         let currentFilter = 'all';
         
         async function loadLeads() {
+            console.log('loadLeads() chamada - iniciando requisição para /api/leads');
             try {
+                console.log('Fazendo fetch para /api/leads...');
                 const response = await fetch('/api/leads');
+                console.log('Resposta recebida:', response.status, response.statusText);
+                
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
+                
                 const data = await response.json();
                 console.log('Dados recebidos:', data);
                 allLeads = data.leads || [];
-                console.log('Leads processados:', allLeads);
+                console.log('Leads processados:', allLeads.length, 'leads');
                 
                 if (allLeads.length === 0) {
                     document.getElementById('leads-container').innerHTML = 
@@ -843,8 +848,19 @@ Este e-mail foi enviado automaticamente. Por favor, não responda.\`;
             }
         }
         
-        // Carregar leads ao iniciar
-        loadLeads();
+        // Carregar leads quando a página estiver pronta
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Página carregada, iniciando carregamento de leads...');
+            loadLeads();
+        });
+        
+        // Também tentar carregar imediatamente (caso DOM já esteja pronto)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadLeads);
+        } else {
+            console.log('DOM já está pronto, carregando leads imediatamente...');
+            loadLeads();
+        }
         
         // Atualizar a cada 30 segundos
         setInterval(loadLeads, 30000);
@@ -1683,6 +1699,7 @@ def list_leads():
         conn.close()
         
         logger.info(f'Listando leads: {len(leads)} encontrados')
+        logger.info(f'Primeiro lead (se houver): {leads[0] if leads else "Nenhum"}')
         return jsonify({'leads': leads})
     except Exception as e:
         logger.error(f'Erro ao listar leads: {str(e)}')
