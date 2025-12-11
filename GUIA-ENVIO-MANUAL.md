@@ -17,7 +17,7 @@ DISABLE_AUTO_EMAIL=true
 **O que isso faz:**
 - ✅ Os leads continuam sendo salvos no banco de dados
 - ✅ O sistema NÃO tenta enviar e-mails automaticamente
-- ✅ Você pode acessar `/admin` para ver todos os leads
+- ✅ Você pode acessar `/ldir26` para ver todos os leads
 - ✅ Você envia os e-mails manualmente pelo Gmail
 
 ### 2. Acessar a Página de Administração
@@ -25,13 +25,13 @@ DISABLE_AUTO_EMAIL=true
 Após fazer deploy, acesse:
 
 ```
-https://seu-dominio.com/admin
+https://seu-dominio.com/ldir26
 ```
 
 Ou se estiver em desenvolvimento local:
 
 ```
-http://localhost:8080/admin
+http://localhost:8080/ldir26
 ```
 
 ## 📋 Como Usar a Página de Administração
@@ -81,12 +81,12 @@ Após enviar o e-mail pelo Gmail:
 
 1. **Cliente preenche o formulário** na landing page
 2. **Lead é salvo** no banco de dados
-3. **Você acessa `/admin`** para ver o novo lead
+3. **Você acessa `/ldir26`** para ver o novo lead
 4. **Clica em "📋 Copiar Info"** para copiar as informações
 5. **Abre o Gmail** e cola as informações
 6. **Anexa o PDF** (se necessário)
 7. **Envia o e-mail** manualmente
-8. **Volta para `/admin`** e clica em "✅ Marcar Enviado"
+8. **Volta para `/ldir26`** e clica em "✅ Marcar Enviado"
 
 ## 🔄 Atualização Automática
 
@@ -110,7 +110,7 @@ A página mostra estatísticas em tempo real:
 
 ## 🔒 Segurança
 
-**Importante:** A página `/admin` está **pública** por padrão. Para produção, considere:
+**Importante:** A página `/ldir26` está **pública** por padrão. Para produção, considere:
 
 1. Adicionar autenticação básica
 2. Restringir acesso por IP

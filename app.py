@@ -594,10 +594,7 @@ Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
                     <!-- Header com Logo -->
                     <tr>
                         <td align="center" style="padding: 40px 30px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-                            <div style="color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: 1px;">
-                                💰 Investir é Realizar
-                            </div>
-                            <!-- SUBSTITUA ACIMA PELO SEU LOGO: <img src="URL_DO_SEU_LOGO" alt="Investir é Realizar" style="max-width: 200px; height: auto; display: block;" /> -->
+                            <img src="https://raw.githubusercontent.com/suellencna/Landing/main/LOGO%20-%20sem%20fundo.png" alt="Investir é Realizar" style="max-width: 200px; height: auto; display: block;" />
                         </td>
                     </tr>
                     
@@ -1534,7 +1531,7 @@ Este e-mail foi enviado automaticamente. Por favor, não responda.
                 # Se envio automático estiver desabilitado, apenas loga
                 if DISABLE_AUTO_EMAIL:
                     logger.info(f'⚠️ Envio automático desabilitado. Lead {lead_id} aguardando envio manual.')
-                    logger.info(f'   Acesse /admin para ver leads pendentes e enviar manualmente.')
+                    logger.info(f'   Acesse /ldir26 para ver leads pendentes e enviar manualmente.')
                     return
                 
                 # Enviar e-mail ao lead
@@ -1674,7 +1671,7 @@ def list_leads():
         logger.error(f'Erro ao listar leads: {str(e)}')
         return jsonify({'error': 'Erro ao listar leads'}), 500
 
-@app.route('/admin')
+@app.route('/ldir26')
 def admin():
     """Página de administração para gerenciar leads e envio manual de e-mails"""
     return render_template_string(ADMIN_HTML)
