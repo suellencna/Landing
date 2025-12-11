@@ -437,14 +437,27 @@ ADMIN_HTML = '''
         async function loadLeads() {
             try {
                 const response = await fetch('/api/leads');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
+                console.log('Dados recebidos:', data);
                 allLeads = data.leads || [];
+                console.log('Leads processados:', allLeads);
+                
+                if (allLeads.length === 0) {
+                    document.getElementById('leads-container').innerHTML = 
+                        '<div class="empty">Nenhum lead encontrado no banco de dados.</div>';
+                    updateStats();
+                    return;
+                }
                 
                 updateStats();
                 filterLeads(currentFilter);
             } catch (error) {
+                console.error('Erro ao carregar leads:', error);
                 document.getElementById('leads-container').innerHTML = 
-                    '<div class="empty">❌ Erro ao carregar leads. Tente novamente.</div>';
+                    '<div class="empty">❌ Erro ao carregar leads: ' + error.message + '<br>Tente novamente ou verifique o console do navegador.</div>';
             }
         }
         
@@ -452,6 +465,8 @@ ADMIN_HTML = '''
             const total = allLeads.length;
             const pending = allLeads.filter(l => !l.email_sent).length;
             const sent = allLeads.filter(l => l.email_sent).length;
+            
+            console.log('Atualizando estatísticas:', { total, pending, sent });
             
             document.getElementById('total-leads').textContent = total;
             document.getElementById('pending-emails').textContent = pending;
@@ -479,6 +494,7 @@ ADMIN_HTML = '''
         
         function displayLeads(leads) {
             const container = document.getElementById('leads-container');
+            console.log('Displaying leads:', leads);
             
             if (leads.length === 0) {
                 container.innerHTML = '<div class="empty">Nenhum lead encontrado</div>';
@@ -1666,10 +1682,13 @@ def list_leads():
         
         conn.close()
         
+        logger.info(f'Listando leads: {len(leads)} encontrados')
         return jsonify({'leads': leads})
     except Exception as e:
         logger.error(f'Erro ao listar leads: {str(e)}')
-        return jsonify({'error': 'Erro ao listar leads'}), 500
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Erro ao listar leads', 'details': str(e)}), 500
 
 @app.route('/ldir26')
 def admin():
