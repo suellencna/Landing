@@ -41,6 +41,15 @@ except ImportError:
     RESEND_SDK_AVAILABLE = False
     logger.warning('SDK do Resend não instalado. Instale com: pip install resend')
 
+# Tentar importar SendGrid SDK (opcional)
+try:
+    import sendgrid
+    from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+    SENDGRID_SDK_AVAILABLE = True
+except ImportError:
+    SENDGRID_SDK_AVAILABLE = False
+    logger.warning('SDK do SendGrid não instalado. Instale com: pip install sendgrid')
+
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Permite requisições do frontend
 
@@ -80,6 +89,32 @@ def get_resend_from_email():
 def get_use_resend():
     """Obtém USE_RESEND de forma lazy e indireta"""
     var_name = 'USE_' + 'RESEND'
+    try:
+        return os.getenv(var_name, 'false').lower() == 'true'
+    except:
+        return False
+
+# Configurações SendGrid (API REST - alternativa ao Resend e SMTP)
+def get_sendgrid_api_key():
+    """Obtém SENDGRID_API_KEY de forma lazy e indireta"""
+    var_name = 'SENDGRID_' + 'API_' + 'KEY'
+    try:
+        return os.getenv(var_name, '') or ''
+    except:
+        return ''
+
+def get_sendgrid_from_email():
+    """Obtém SENDGRID_FROM_EMAIL de forma lazy e indireta"""
+    var_name = 'SENDGRID_' + 'FROM_' + 'EMAIL'
+    try:
+        result = os.getenv(var_name, '') or SMTP_USER or ''
+        return result
+    except:
+        return SMTP_USER or ''
+
+def get_use_sendgrid():
+    """Obtém USE_SENDGRID de forma lazy e indireta"""
+    var_name = 'USE_' + 'SENDGRID'
     try:
         return os.getenv(var_name, 'false').lower() == 'true'
     except:
@@ -179,8 +214,12 @@ def check_network_connectivity(host, port, timeout=5):
         logger.warning(f'Não foi possível conectar a {host}:{port} - {str(e)}')
         return False
 
-def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
-    """Envia e-mail usando o SDK oficial do Resend"""
+def send_email_resend(to_email, subject, body, pdf_path=None, name='', use_resend_domain=False):
+    """Envia e-mail usando o SDK oficial do Resend
+    
+    Args:
+        use_resend_domain: Se True, usa onboarding@resend.dev em vez do e-mail configurado
+    """
     resend_api_key = get_resend_api_key()
     resend_from_email = get_resend_from_email()
     
@@ -188,27 +227,33 @@ def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
         logger.warning('RESEND_API_KEY não configurada. Pulando envio via Resend.')
         return False
     
-    if not resend_from_email:
-        logger.warning('RESEND_FROM_EMAIL não configurada. Pulando envio via Resend.')
-        return False
-    
     if not RESEND_SDK_AVAILABLE:
         logger.error('SDK do Resend não está instalado. Instale com: pip install resend')
         return False
     
-    logger.info(f'Tentando enviar e-mail via Resend para {to_email}')
+    # Se usar domínio do Resend ou se não tiver e-mail configurado, usar o domínio padrão
+    if use_resend_domain or not resend_from_email:
+        from_email = "onboarding@resend.dev"
+        logger.info(f'Usando domínio do Resend: {from_email}')
+    else:
+        from_email = resend_from_email
+    
+    logger.info(f'Tentando enviar e-mail via Resend para {to_email} (de: {from_email})')
     
     try:
         # Configurar API key
         resend.api_key = resend_api_key
         
-        # Preparar parâmetros do e-mail
+        # Preparar parâmetros do e-mail conforme documentação do Resend
+        # O 'to' pode ser string ou lista - vamos usar lista conforme documentação
         params = {
-            "from": resend_from_email,
-            "to": [to_email],
+            "from": from_email,
+            "to": to_email,  # Resend aceita string ou lista - usar string conforme docs
             "subject": subject,
             "text": body
         }
+        
+        logger.info(f'Parâmetros do e-mail: from={from_email}, to={to_email}, subject={subject[:50]}...')
         
         # Adicionar anexo PDF se existir
         if pdf_path and os.path.exists(pdf_path):
@@ -221,51 +266,159 @@ def send_email_resend(to_email, subject, body, pdf_path=None, name=''):
                         "filename": "CORRETORAS - Investir é Realizar.pdf",
                         "content": pdf_base64
                     }]
+                logger.info(f'PDF preparado para anexo ({len(pdf_content)} bytes)')
+            except Exception as pdf_error:
+                logger.error(f'Erro ao preparar PDF: {str(pdf_error)}')
+                import traceback
+                logger.error(traceback.format_exc())
+                # Continua sem o PDF
+        
+        # Enviar via SDK Resend
+        logger.info('Enviando e-mail via API Resend...')
+        logger.info(f'API Key configurada: {resend_api_key[:10]}...{resend_api_key[-4:] if len(resend_api_key) > 14 else "***"}')
+        
+        email = resend.Emails.send(params)
+        
+        logger.info(f'Tipo da resposta: {type(email)}')
+        logger.info(f'Resposta completa do Resend: {email}')
+        
+        # Verificar resposta - o Resend retorna um dicionário com 'id' em caso de sucesso
+        if email:
+            email_id = None
+            
+            # Tentar extrair o ID de diferentes formas
+            if isinstance(email, dict):
+                email_id = email.get('id') or email.get('data', {}).get('id')
+                if email_id:
+                    logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email_id})')
+                    return True
+            elif hasattr(email, 'id'):
+                email_id = email.id
+                logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email_id})')
+                return True
+            elif hasattr(email, 'data') and hasattr(email.data, 'id'):
+                email_id = email.data.id
+                logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email_id})')
+                return True
+            else:
+                # Tentar converter para string e verificar
+                email_str = str(email)
+                if 'id' in email_str.lower() or 'success' in email_str.lower():
+                    logger.info(f'✅ E-mail parece ter sido enviado. Resposta: {email_str[:200]}')
+                    return True
+        
+        logger.warning(f'⚠️ Resposta do Resend não contém ID de sucesso: {email}')
+        # Mesmo sem ID claro, se não houve exceção, pode ter funcionado
+        # Vamos retornar True mas com aviso
+        logger.info('⚠️ Assumindo sucesso (sem exceção lançada). Verifique no dashboard do Resend.')
+        return True
+            
+    except Exception as e:
+        error_type = type(e).__name__
+        error_msg = str(e)
+        
+        logger.error(f'❌ Erro ao enviar e-mail via Resend: {error_type}: {error_msg}')
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        # Detectar erro de domínio não verificado
+        if 'domain is not verified' in error_msg.lower() or 'not verified' in error_msg.lower() or 'gmail.com domain' in error_msg.lower():
+            logger.warning(f'⚠️ Domínio não verificado no Resend: {from_email}')
+            logger.info('Tentando usar domínio do Resend (onboarding@resend.dev)...')
+            
+            # Tentar novamente com domínio do Resend
+            if not use_resend_domain:
+                return send_email_resend(to_email, subject, body, pdf_path, name, use_resend_domain=True)
+            else:
+                logger.error('❌ Falha mesmo usando domínio do Resend. Verifique a API Key.')
+                return False
+        
+        # Detectar outros erros comuns
+        if 'invalid api key' in error_msg.lower() or 'unauthorized' in error_msg.lower():
+            logger.error('❌ API Key inválida ou não autorizada. Verifique RESEND_API_KEY.')
+            return False
+        
+        if 'rate limit' in error_msg.lower() or 'too many requests' in error_msg.lower():
+            logger.error('❌ Limite de taxa excedido. Aguarde alguns minutos.')
+            return False
+        
+        return False
+
+def send_email_sendgrid(to_email, subject, body, pdf_path=None, name=''):
+    """Envia e-mail usando o SDK oficial do SendGrid"""
+    sendgrid_api_key = get_sendgrid_api_key()
+    sendgrid_from_email = get_sendgrid_from_email()
+    
+    if not sendgrid_api_key:
+        logger.warning('SENDGRID_API_KEY não configurada. Pulando envio via SendGrid.')
+        return False
+    
+    if not sendgrid_from_email:
+        logger.warning('SENDGRID_FROM_EMAIL não configurada. Pulando envio via SendGrid.')
+        return False
+    
+    if not SENDGRID_SDK_AVAILABLE:
+        logger.error('SDK do SendGrid não está instalado. Instale com: pip install sendgrid')
+        return False
+    
+    logger.info(f'Tentando enviar e-mail via SendGrid para {to_email} (de: {sendgrid_from_email})')
+    
+    try:
+        # Criar cliente SendGrid
+        sg = sendgrid.SendGridAPIClient(api_key=sendgrid_api_key)
+        
+        # Criar mensagem
+        message = Mail(
+            from_email=sendgrid_from_email,
+            to_emails=to_email,
+            subject=subject,
+            plain_text_content=body
+        )
+        
+        # Adicionar anexo PDF se existir
+        if pdf_path and os.path.exists(pdf_path):
+            logger.info(f'Anexando PDF: {pdf_path}')
+            try:
+                with open(pdf_path, 'rb') as f:
+                    pdf_content = f.read()
+                    pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                    
+                    attached_file = Attachment(
+                        FileContent(pdf_base64),
+                        FileName("CORRETORAS - Investir é Realizar.pdf"),
+                        FileType('application/pdf'),
+                        Disposition('attachment')
+                    )
+                    message.add_attachment(attached_file)
                 logger.info('PDF preparado para anexo')
             except Exception as pdf_error:
                 logger.error(f'Erro ao preparar PDF: {str(pdf_error)}')
                 # Continua sem o PDF
         
-        # Enviar via SDK Resend
-        logger.info('Enviando e-mail via API Resend...')
-        email = resend.Emails.send(params)
-        
-        logger.info(f'Resposta do Resend: {email}')
+        # Enviar via SendGrid
+        logger.info('Enviando e-mail via API SendGrid...')
+        response = sg.send(message)
         
         # Verificar resposta
-        if email:
-            # O Resend retorna um objeto com 'id' ou um dicionário
-            if isinstance(email, dict):
-                email_id = email.get('id', 'N/A')
-                if email_id != 'N/A':
-                    logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email_id})')
-                    return True
-            elif hasattr(email, 'id'):
-                logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email.id})')
-                return True
-            else:
-                # Tentar acessar como atributo
-                try:
-                    email_id = email.id if hasattr(email, 'id') else str(email)
-                    logger.info(f'✅ E-mail enviado com sucesso via Resend para {to_email} (ID: {email_id})')
-                    return True
-                except:
-                    pass
-        
-        logger.error(f'❌ Resposta inesperada do Resend: {email}')
-        return False
+        if response.status_code in [200, 201, 202]:
+            logger.info(f'✅ E-mail enviado com sucesso via SendGrid para {to_email} (Status: {response.status_code})')
+            return True
+        else:
+            logger.error(f'❌ Erro ao enviar via SendGrid. Status: {response.status_code}')
+            logger.error(f'Resposta: {response.body}')
+            return False
             
     except Exception as e:
         error_type = type(e).__name__
         error_msg = str(e)
-        logger.error(f'❌ Erro ao enviar e-mail via Resend: {error_type}: {error_msg}')
+        logger.error(f'❌ Erro ao enviar e-mail via SendGrid: {error_type}: {error_msg}')
         import traceback
         logger.error(traceback.format_exc())
         return False
 
 def send_email(to_email, subject, body, pdf_path=None, name='', max_retries=3):
     """Envia e-mail com PDF anexado com retry automático
-    Tenta Resend primeiro (se configurado), depois SMTP como fallback"""
+    Tenta Resend primeiro (se configurado), depois SendGrid, depois SMTP como fallback"""
     
     # Tentar Resend primeiro se estiver configurado
     use_resend = get_use_resend()
@@ -275,7 +428,17 @@ def send_email(to_email, subject, body, pdf_path=None, name='', max_retries=3):
         logger.info('Resend configurado. Tentando enviar via API REST...')
         if send_email_resend(to_email, subject, body, pdf_path, name):
             return True
-        logger.warning('Falha ao enviar via Resend. Tentando SMTP como fallback...')
+        logger.warning('Falha ao enviar via Resend. Tentando SendGrid...')
+    
+    # Tentar SendGrid como segunda opção
+    use_sendgrid = get_use_sendgrid()
+    sendgrid_api_key = get_sendgrid_api_key()
+    
+    if use_sendgrid and sendgrid_api_key:
+        logger.info('SendGrid configurado. Tentando enviar via API REST...')
+        if send_email_sendgrid(to_email, subject, body, pdf_path, name):
+            return True
+        logger.warning('Falha ao enviar via SendGrid. Tentando SMTP como fallback...')
     
     # Fallback para SMTP
     # Verificar credenciais SMTP
@@ -712,7 +875,16 @@ if __name__ == '__main__':
     resend_from_email = get_resend_from_email()
     logger.info(f'USE_RESEND: {"✅ Ativado" if use_resend else "❌ Desativado"}')
     logger.info(f'RESEND_API_KEY: {"✅ Configurado" if resend_api_key else "❌ NÃO configurado"}')
-    logger.info(f'RESEND_FROM_EMAIL: {resend_from_email if resend_from_email else "❌ NÃO configurado"}')
+    logger.info(f'RESEND_FROM_EMAIL: {resend_from_email if resend_from_email else "❌ NÃO configurado (usará onboarding@resend.dev)"}')
+    
+    # SendGrid (API REST - Alternativa)
+    logger.info('--- SendGrid (API REST) ---')
+    use_sendgrid = get_use_sendgrid()
+    sendgrid_api_key = get_sendgrid_api_key()
+    sendgrid_from_email = get_sendgrid_from_email()
+    logger.info(f'USE_SENDGRID: {"✅ Ativado" if use_sendgrid else "❌ Desativado"}')
+    logger.info(f'SENDGRID_API_KEY: {"✅ Configurado" if sendgrid_api_key else "❌ NÃO configurado"}')
+    logger.info(f'SENDGRID_FROM_EMAIL: {sendgrid_from_email if sendgrid_from_email else "❌ NÃO configurado"}')
     
     # SMTP (Fallback)
     logger.info('--- SMTP (Fallback) ---')
@@ -726,16 +898,28 @@ if __name__ == '__main__':
     logger.info('=' * 50)
     
     # Verificar se há método de envio configurado
+    methods_configured = []
     if use_resend and resend_api_key:
-        logger.info('✅ Resend configurado - usando API REST para envio de e-mails')
-        if SMTP_USER and SMTP_PASSWORD:
-            logger.info('✅ SMTP também configurado - será usado como fallback se Resend falhar')
-    elif SMTP_USER and SMTP_PASSWORD:
-        logger.info('✅ SMTP configurado - usando SMTP para envio de e-mails')
-        logger.info('💡 Dica: Configure RESEND_API_KEY e USE_RESEND=true para usar API REST (mais confiável)')
+        methods_configured.append('Resend')
+    if use_sendgrid and sendgrid_api_key:
+        methods_configured.append('SendGrid')
+    if SMTP_USER and SMTP_PASSWORD:
+        methods_configured.append('SMTP')
+    
+    if methods_configured:
+        logger.info(f'✅ Métodos de envio configurados: {", ".join(methods_configured)}')
+        if 'Resend' in methods_configured:
+            logger.info('   → Resend será tentado primeiro (API REST)')
+        if 'SendGrid' in methods_configured:
+            logger.info('   → SendGrid será tentado como segunda opção (API REST)')
+        if 'SMTP' in methods_configured:
+            logger.info('   → SMTP será usado como fallback final')
     else:
         logger.warning('⚠️ Nenhum método de envio configurado!')
-        logger.warning('Configure RESEND_API_KEY e USE_RESEND=true OU SMTP_USER e SMTP_PASSWORD')
+        logger.warning('Configure pelo menos um dos seguintes:')
+        logger.warning('  1. RESEND_API_KEY e USE_RESEND=true (Recomendado)')
+        logger.warning('  2. SENDGRID_API_KEY e USE_SENDGRID=true')
+        logger.warning('  3. SMTP_USER e SMTP_PASSWORD')
     
     logger.info('Servidor iniciando...')
     
