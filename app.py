@@ -3,7 +3,7 @@ Backend Flask para Landing Page de Captação de Leads
 Sistema com banco de dados SQLite e envio de e-mail
 """
 
-from flask import Flask, request, jsonify, send_file, render_template_string
+from flask import Flask, request, jsonify, send_file, render_template_string, session, redirect, url_for
 from flask_cors import CORS
 from datetime import datetime
 import sqlite3
@@ -51,6 +51,7 @@ except ImportError:
     logger.warning('SDK do SendGrid não instalado. Instale com: pip install sendgrid')
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'sua-chave-secreta-mude-isso-em-producao-2024')
 CORS(app)  # Permite requisições do frontend
 
 # Configurações (podem ser movidas para variáveis de ambiente)
@@ -64,6 +65,7 @@ SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '').replace(' ', '')
 OWNER_EMAIL = os.getenv('OWNER_EMAIL', '')
 SITE_NAME = os.getenv('SITE_NAME', 'Investir é Realizar')
 GUIDE_TITLE = os.getenv('GUIDE_TITLE', 'Guia Rápido: Principais Corretoras do Brasil')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'ldir26-seguro-2024')  # Mude isso em produção!
 
 # Template HTML para página de administração
 ADMIN_HTML = '''
@@ -344,8 +346,13 @@ ADMIN_HTML = '''
 <body>
     <div class="container">
         <div class="header">
-            <h1>📧 Administração de Leads</h1>
-            <p>Gerencie os leads e envie e-mails manualmente pelo Gmail</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>📧 Administração de Leads</h1>
+                    <p>Gerencie os leads e envie e-mails manualmente pelo Gmail</p>
+                </div>
+                <a href="/ldir26/logout" style="color: white; text-decoration: none; padding: 10px 20px; background: rgba(255,255,255,0.2); border-radius: 6px; font-size: 14px;">🚪 Sair</a>
+            </div>
         </div>
         
         <div class="stats" id="stats">
@@ -435,20 +442,19 @@ ADMIN_HTML = '''
         let currentFilter = 'all';
         
         async function loadLeads() {
-            console.log('loadLeads() chamada - iniciando requisição para /api/leads');
             try {
-                console.log('Fazendo fetch para /api/leads...');
                 const response = await fetch('/api/leads');
-                console.log('Resposta recebida:', response.status, response.statusText);
                 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/ldir26/login';
+                        return;
+                    }
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();
-                console.log('Dados recebidos:', data);
                 allLeads = data.leads || [];
-                console.log('Leads processados:', allLeads.length, 'leads');
                 
                 if (allLeads.length === 0) {
                     document.getElementById('leads-container').innerHTML = 
@@ -470,8 +476,6 @@ ADMIN_HTML = '''
             const total = allLeads.length;
             const pending = allLeads.filter(l => !l.email_sent).length;
             const sent = allLeads.filter(l => l.email_sent).length;
-            
-            console.log('Atualizando estatísticas:', { total, pending, sent });
             
             document.getElementById('total-leads').textContent = total;
             document.getElementById('pending-emails').textContent = pending;
@@ -499,7 +503,6 @@ ADMIN_HTML = '''
         
         function displayLeads(leads) {
             const container = document.getElementById('leads-container');
-            console.log('Displaying leads:', leads);
             
             if (leads.length === 0) {
                 container.innerHTML = '<div class="empty">Nenhum lead encontrado</div>';
@@ -517,10 +520,17 @@ ADMIN_HTML = '''
                     : '<span class="badge pending">⏳ Pendente</span>';
                 
                 html += '<tr>';
+                // Sanitizar dados para prevenir XSS
+                const sanitize = (str) => {
+                    const div = document.createElement('div');
+                    div.textContent = str;
+                    return div.innerHTML;
+                };
+                
                 html += `<td>${lead.id}</td>`;
-                html += `<td>${lead.name}</td>`;
-                html += `<td>${lead.email}</td>`;
-                html += `<td>${lead.phone}</td>`;
+                html += `<td>${sanitize(lead.name)}</td>`;
+                html += `<td>${sanitize(lead.email)}</td>`;
+                html += `<td>${sanitize(lead.phone)}</td>`;
                 html += `<td>${date}</td>`;
                 html += `<td>${status}</td>`;
                 html += '<td>';
@@ -695,117 +705,6 @@ Investir é Realizar
 Este e-mail foi enviado automaticamente. Por favor, não responda.`;
         }
         
-        function copyLeadInfo(leadId) {
-            const lead = allLeads.find(l => l.id === leadId);
-            if (!lead) return;
-            
-            const emailHTML = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seu PDF: Guia Rápido: Principais Corretoras do Brasil</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
-        <tr>
-            <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                    <!-- Header com Logo -->
-                    <tr>
-                        <td align="center" style="padding: 40px 30px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-                            <img src="https://via.placeholder.com/200x60/ffffff/667eea?text=Investir+é+Realizar" alt="Investir é Realizar" style="max-width: 200px; height: auto; display: block;" />
-                            <!-- SUBSTITUA O LINK ACIMA PELO LINK DO SEU LOGO REAL -->
-                        </td>
-                    </tr>
-                    
-                    <!-- Conteúdo Principal -->
-                    <tr>
-                        <td style="padding: 40px 30px;">
-                            <h1 style="margin: 0 0 20px; color: #333333; font-size: 24px; font-weight: 600; line-height: 1.4;">
-                                Olá, ${lead.name}! 👋
-                            </h1>
-                            
-                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
-                                Obrigado por se cadastrar! Segue o seu <strong>PDF gratuito</strong> que você solicitou:
-                            </p>
-                            
-                            <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 30px 0; border-radius: 4px;">
-                                <p style="margin: 0; color: #333333; font-size: 18px; font-weight: 600;">
-                                    📄 Guia Rápido: Principais Corretoras do Brasil
-                                </p>
-                            </div>
-                            
-                            <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
-                                O PDF está anexado a este e-mail. Você também pode baixá-lo diretamente pelo link abaixo:
-                            </p>
-                            
-                            <!-- Botão de Download -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center" style="padding: 20px 0;">
-                                        <a href="https://web-production-4df5e.up.railway.app/api/download-pdf" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                                            📥 Baixar PDF Agora
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                            <p style="margin: 30px 0 20px; color: #666666; font-size: 16px; line-height: 1.6;">
-                                Bons estudos e sucesso nos seus investimentos! 💰
-                            </p>
-                            
-                            <p style="margin: 0; color: #666666; font-size: 16px; line-height: 1.6;">
-                                Atenciosamente,<br>
-                                <strong style="color: #667eea;">Equipe Investir é Realizar</strong>
-                            </p>
-                        </td>
-                    </tr>
-                    
-                    <!-- Footer -->
-                    <tr>
-                        <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; border-top: 1px solid #e9ecef;">
-                            <p style="margin: 0 0 10px; color: #999999; font-size: 12px; line-height: 1.5; text-align: center;">
-                                Este e-mail foi enviado automaticamente. Por favor, não responda.
-                            </p>
-                            <p style="margin: 0; color: #999999; font-size: 12px; line-height: 1.5; text-align: center;">
-                                © ${new Date().getFullYear()} Investir é Realizar. Todos os direitos reservados.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-            
-            const textToCopy = `Para: ${lead.email}
-Assunto: Seu PDF: Guia Rápido: Principais Corretoras do Brasil
-
---- COLE O HTML ABAIXO NO GMAIL (use "Inserir HTML" ou cole no modo HTML) ---
-
-${emailHTML}
-
---- OU USE O TEXTO SIMPLES ABAIXO ---
-
-Oi, ${lead.name}!
-
-Segue o seu PDF gratuito: Guia Rápido: Principais Corretoras do Brasil.
-
-Você pode baixar pelo link direto ou usar o arquivo anexado a este e-mail.
-
-Bons estudos!
-Investir é Realizar
-
----
-Este e-mail foi enviado automaticamente. Por favor, não responda.`;
-            
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                showNotification();
-            });
-        }
-        
         async function markAsSent(leadId) {
             if (!confirm('Marcar este e-mail como enviado?')) return;
             
@@ -849,16 +748,9 @@ Este e-mail foi enviado automaticamente. Por favor, não responda.`;
         }
         
         // Carregar leads quando a página estiver pronta
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Página carregada, iniciando carregamento de leads...');
-            loadLeads();
-        });
-        
-        // Também tentar carregar imediatamente (caso DOM já esteja pronto)
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', loadLeads);
         } else {
-            console.log('DOM já está pronto, carregando leads imediatamente...');
             loadLeads();
         }
         
@@ -1629,6 +1521,17 @@ E-mail enviado: {'Sim' if email_sent else 'Não'}
             'message': 'Erro interno do servidor. Tente novamente mais tarde.'
         }), 500
 
+def require_admin():
+    """Decorator para proteger rotas administrativas"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not session.get('admin_logged_in'):
+                return jsonify({'error': 'Não autorizado'}), 401
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 @app.route('/api/download-pdf', methods=['GET'])
 def download_pdf():
     """Endpoint para download do PDF"""
@@ -1671,6 +1574,7 @@ def get_stats():
         return jsonify({'error': 'Erro ao obter estatísticas'}), 500
 
 @app.route('/api/leads', methods=['GET'])
+@require_admin()
 def list_leads():
     """Lista todos os leads (protegido - pode adicionar autenticação)"""
     try:
@@ -1707,12 +1611,84 @@ def list_leads():
         logger.error(traceback.format_exc())
         return jsonify({'error': 'Erro ao listar leads', 'details': str(e)}), 500
 
+@app.route('/ldir26/login', methods=['GET', 'POST'])
+def admin_login():
+    """Página de login para área administrativa"""
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        if password == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            return redirect(url_for('admin'))
+        else:
+            return render_template_string('''
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Login - Administração</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+                        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; width: 100%; }
+                        h1 { color: #667eea; margin-bottom: 20px; }
+                        input { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #e9ecef; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+                        button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+                        button:hover { opacity: 0.9; }
+                        .error { color: #dc3545; margin-top: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="login-box">
+                        <h1>🔐 Login Administrativo</h1>
+                        <form method="POST">
+                            <input type="password" name="password" placeholder="Senha" required autofocus>
+                            <button type="submit">Entrar</button>
+                            <div class="error">❌ Senha incorreta. Tente novamente.</div>
+                        </form>
+                    </div>
+                </body>
+                </html>
+            ''')
+    
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Login - Administração</title>
+            <style>
+                body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+                .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; width: 100%; }
+                h1 { color: #667eea; margin-bottom: 20px; }
+                input { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #e9ecef; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+                button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+                button:hover { opacity: 0.9; }
+            </style>
+        </head>
+        <body>
+            <div class="login-box">
+                <h1>🔐 Login Administrativo</h1>
+                <form method="POST">
+                    <input type="password" name="password" placeholder="Senha" required autofocus>
+                    <button type="submit">Entrar</button>
+                </form>
+            </div>
+        </body>
+        </html>
+    ''')
+
+@app.route('/ldir26/logout')
+def admin_logout():
+    """Logout da área administrativa"""
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin_login'))
+
 @app.route('/ldir26')
 def admin():
     """Página de administração para gerenciar leads e envio manual de e-mails"""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
     return render_template_string(ADMIN_HTML)
 
 @app.route('/api/leads/<int:lead_id>/mark-sent', methods=['POST'])
+@require_admin()
 def mark_email_sent(lead_id):
     """Marca um e-mail como enviado manualmente"""
     try:
