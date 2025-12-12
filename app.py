@@ -8,6 +8,7 @@ from flask_cors import CORS
 from datetime import datetime
 import sqlite3
 import os
+import urllib.parse
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -55,8 +56,12 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'sua-chave-secreta-mude-isso-em-p
 CORS(app)  # Permite requisições do frontend
 
 # Configurações (podem ser movidas para variáveis de ambiente)
-DATABASE = 'leads.db'
+DATABASE_URL = os.getenv('DATABASE_URL')  # PostgreSQL do Railway
+DATABASE = 'leads.db'  # SQLite (fallback)
 PDF_PATH = 'assets/pdf/corretoras.pdf'
+
+# Detectar qual banco usar
+USE_POSTGRESQL = DATABASE_URL is not None and DATABASE_URL.startswith('postgresql://')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
 SMTP_USER = os.getenv('SMTP_USER', '')
@@ -849,7 +854,60 @@ def rate_limit(max_requests=5, window=60):
     return decorator
 
 def init_db():
-    """Inicializa o banco de dados SQLite"""
+    """Inicializa o banco de dados (PostgreSQL ou SQLite)"""
+    if USE_POSTGRESQL:
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            
+            # Parse DATABASE_URL
+            result = urllib.parse.urlparse(DATABASE_URL)
+            conn = psycopg2.connect(
+                database=result.path[1:],  # Remove leading /
+                user=result.username,
+                password=result.password,
+                host=result.hostname,
+                port=result.port
+            )
+            cursor = conn.cursor()
+            
+            # Criar tabela (PostgreSQL)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS leads (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    email VARCHAR(255) NOT NULL,
+                    phone VARCHAR(50),
+                    consent BOOLEAN NOT NULL DEFAULT FALSE,
+                    user_agent TEXT,
+                    ip_address VARCHAR(45),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    email_sent BOOLEAN DEFAULT FALSE,
+                    email_sent_at TIMESTAMP
+                )
+            ''')
+            
+            # Índices
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_email ON leads(email)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_created_at ON leads(created_at)')
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            logger.info('✅ Banco de dados PostgreSQL inicializado com sucesso')
+        except ImportError:
+            logger.error('❌ psycopg2 não instalado. Instale com: pip install psycopg2-binary')
+            logger.info('⚠️ Usando SQLite como fallback...')
+            init_db_sqlite()
+        except Exception as e:
+            logger.error(f'❌ Erro ao conectar ao PostgreSQL: {str(e)}')
+            logger.info('⚠️ Usando SQLite como fallback...')
+            init_db_sqlite()
+    else:
+        init_db_sqlite()
+
+def init_db_sqlite():
+    """Inicializa o banco de dados SQLite (fallback)"""
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
@@ -874,13 +932,88 @@ def init_db():
     
     conn.commit()
     conn.close()
-    logger.info('Banco de dados inicializado com sucesso')
+    logger.info('✅ Banco de dados SQLite inicializado com sucesso')
 
 def get_db_connection():
-    """Retorna uma conexão com o banco de dados"""
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Retorna uma conexão com o banco de dados (PostgreSQL ou SQLite)"""
+    if USE_POSTGRESQL:
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            
+            # Parse DATABASE_URL
+            result = urllib.parse.urlparse(DATABASE_URL)
+            conn = psycopg2.connect(
+                database=result.path[1:],
+                user=result.username,
+                password=result.password,
+                host=result.hostname,
+                port=result.port
+            )
+            return conn
+        except Exception as e:
+            logger.error(f'❌ Erro ao conectar ao PostgreSQL: {str(e)}')
+            logger.info('⚠️ Tentando SQLite como fallback...')
+            # Fallback para SQLite
+            conn = sqlite3.connect(DATABASE)
+            conn.row_factory = sqlite3.Row
+            return conn
+    else:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+def execute_query(conn, query, params=None):
+    """Executa query compatível com PostgreSQL e SQLite"""
+    cursor = conn.cursor()
+    
+    # Converter placeholders: SQLite usa ?, PostgreSQL usa %s
+    if USE_POSTGRESQL and '?' in query:
+        query = query.replace('?', '%s')
+    
+    if params:
+        cursor.execute(query, params)
+    else:
+        cursor.execute(query)
+    
+    return cursor
+
+def fetch_one_dict(cursor, conn):
+    """Retorna uma linha como dicionário (compatível com PostgreSQL e SQLite)"""
+    if USE_POSTGRESQL:
+        try:
+            from psycopg2.extras import RealDictCursor
+            # Se já é RealDictCursor, retorna direto
+            if isinstance(cursor, RealDictCursor):
+                return cursor.fetchone()
+            # Senão, converte manualmente
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            columns = [desc[0] for desc in cursor.description]
+            return dict(zip(columns, row))
+        except:
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            columns = [desc[0] for desc in cursor.description]
+            return dict(zip(columns, row))
+    else:
+        # SQLite já retorna como Row (que se comporta como dict)
+        return cursor.fetchone()
+
+def fetch_all_dict(cursor, conn):
+    """Retorna todas as linhas como lista de dicionários"""
+    if USE_POSTGRESQL:
+        rows = cursor.fetchall()
+        if not rows:
+            return []
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in rows]
+    else:
+        # SQLite já retorna como Row objects
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
 
 def validate_email(email):
     """Valida formato de e-mail"""
@@ -1401,9 +1534,8 @@ def create_lead():
         
         # Verificar se e-mail já existe
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT id FROM leads WHERE email = ?', (email,))
-        existing = cursor.fetchone()
+        cursor = execute_query(conn, 'SELECT id FROM leads WHERE email = ?', (email,))
+        existing = fetch_one_dict(cursor, conn)
         
         if existing:
             conn.close()
@@ -1419,12 +1551,18 @@ def create_lead():
         user_agent = data.get('userAgent', '')
         ip_address = request.remote_addr
         
-        cursor.execute('''
+        cursor = execute_query(conn, '''
             INSERT INTO leads (name, email, phone, consent, user_agent, ip_address)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (name, email, phone, consent, user_agent, ip_address))
         
-        lead_id = cursor.lastrowid
+        if USE_POSTGRESQL:
+            # PostgreSQL precisa fazer commit antes de pegar o ID
+            conn.commit()
+            cursor = execute_query(conn, 'SELECT LASTVAL()')
+            lead_id = cursor.fetchone()[0]
+        else:
+            lead_id = cursor.lastrowid
         conn.commit()
         conn.close()
         
@@ -1545,21 +1683,27 @@ def get_stats():
     """Endpoint para estatísticas (protegido - pode adicionar autenticação)"""
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
         
         # Total de leads
-        cursor.execute('SELECT COUNT(*) FROM leads')
+        cursor = execute_query(conn, 'SELECT COUNT(*) FROM leads')
         total_leads = cursor.fetchone()[0]
         
         # Leads hoje
-        cursor.execute('''
-            SELECT COUNT(*) FROM leads 
-            WHERE DATE(created_at) = DATE('now')
-        ''')
+        if USE_POSTGRESQL:
+            cursor = execute_query(conn, '''
+                SELECT COUNT(*) FROM leads 
+                WHERE DATE(created_at) = CURRENT_DATE
+            ''')
+        else:
+            cursor = execute_query(conn, '''
+                SELECT COUNT(*) FROM leads 
+                WHERE DATE(created_at) = DATE('now')
+            ''')
         leads_today = cursor.fetchone()[0]
         
         # E-mails enviados
-        cursor.execute('SELECT COUNT(*) FROM leads WHERE email_sent = 1')
+        email_sent_value = True if USE_POSTGRESQL else 1
+        cursor = execute_query(conn, 'SELECT COUNT(*) FROM leads WHERE email_sent = ?', (email_sent_value,))
         emails_sent = cursor.fetchone()[0]
         
         conn.close()
@@ -1579,24 +1723,24 @@ def list_leads():
     """Lista todos os leads (protegido - pode adicionar autenticação)"""
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
         
-        cursor.execute('''
+        cursor = execute_query(conn, '''
             SELECT id, name, email, phone, consent, created_at, email_sent
             FROM leads
             ORDER BY created_at DESC
             LIMIT 100
         ''')
         
+        rows = fetch_all_dict(cursor, conn)
         leads = []
-        for row in cursor.fetchall():
+        for row in rows:
             leads.append({
                 'id': row['id'],
                 'name': row['name'],
                 'email': row['email'],
                 'phone': row['phone'],
                 'consent': bool(row['consent']),
-                'created_at': row['created_at'],
+                'created_at': str(row['created_at']),
                 'email_sent': bool(row['email_sent'])
             })
         
@@ -1693,13 +1837,13 @@ def mark_email_sent(lead_id):
     """Marca um e-mail como enviado manualmente"""
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
         
-        cursor.execute('''
+        email_sent_value = True if USE_POSTGRESQL else 1
+        cursor = execute_query(conn, '''
             UPDATE leads 
-            SET email_sent = 1, email_sent_at = CURRENT_TIMESTAMP
+            SET email_sent = ?, email_sent_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        ''', (lead_id,))
+        ''', (email_sent_value, lead_id))
         
         conn.commit()
         conn.close()
