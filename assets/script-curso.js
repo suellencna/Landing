@@ -1,5 +1,5 @@
+// Script para a página do curso
 // Configuração da API
-// Usa URL relativa para funcionar tanto localmente quanto em produção
 const API_URL = window.location.origin + '/api';
 
 // Elementos do formulário
@@ -10,10 +10,8 @@ const okEl = document.getElementById('formSuccess');
 
 // Máscara de telefone
 function maskPhone(value) {
-  // Remove tudo que não é número
   value = value.replace(/\D/g, '');
   
-  // Aplica a máscara (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
   if (value.length <= 10) {
     value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
   } else {
@@ -157,13 +155,17 @@ form.addEventListener('submit', async (e) => {
     if (input) input.classList.remove('error');
   });
 
+  // Pegar origem do lead
+  const sourceInput = document.getElementById('source');
+  const source = sourceInput ? sourceInput.value : 'curso';
+
   const data = {
     name: nameInput.value.trim(),
     email: emailInput.value.trim(),
     phone: phoneInput.value.trim(),
     consent: document.getElementById('consent').checked,
     website: document.getElementById('website').value, // honeypot
-    source: 'guia', // origem do lead
+    source: source, // origem do lead
     userAgent: navigator.userAgent,
     timestamp: new Date().toISOString()
   };
@@ -216,24 +218,25 @@ form.addEventListener('submit', async (e) => {
     const result = await response.json();
 
     if (response.ok && result.success) {
-      showSuccess('Redirecionando...');
-      // Redireciona para página de obrigado com parâmetro de download
+      // Mostrar mensagem de sucesso e redirecionar
+      showSuccess('🎉 Você está na lista! Redirecionando...');
+      
+      // Redirecionar para página de obrigado do curso
       setTimeout(() => {
-        window.location.href = `obrigado.html?download=1&email=${encodeURIComponent(data.email)}`;
-      }, 500);
+        window.location.href = 'obrigado-curso.html';
+      }, 1000);
     } else {
       throw new Error(result.message || 'Falha ao enviar. Tente novamente.');
     }
   } catch (err) {
     console.error('Erro ao enviar formulário:', err);
     
-    // Verificar se é erro de conexão
     if (err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
-      showError('Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
+      showError('Não foi possível conectar ao servidor. Tente novamente mais tarde.');
     } else {
       showError(err.message || 'Não foi possível enviar agora. Tente mais tarde.');
     }
-    
+  } finally {
     setLoading(false);
   }
 });
@@ -255,11 +258,11 @@ const observer = new IntersectionObserver((entries) => {
 
 // Observar elementos para animação
 document.addEventListener('DOMContentLoaded', () => {
-  const animatedElements = document.querySelectorAll('.form-card, .testimonial, .steps li');
-  animatedElements.forEach(el => {
+  const animatedElements = document.querySelectorAll('.form-card, .module-card, .transform-item, .material-item');
+  animatedElements.forEach((el, index) => {
     el.style.opacity = '0';
     el.style.transform = 'translateY(20px)';
-    el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    el.style.transition = `opacity 0.6s ease ${index * 0.05}s, transform 0.6s ease ${index * 0.05}s`;
     observer.observe(el);
   });
 });

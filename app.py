@@ -373,6 +373,14 @@ ADMIN_HTML = '''
                 <h3 id="sent-emails">-</h3>
                 <p>E-mails Enviados</p>
             </div>
+            <div class="stat-card" style="border-left: 3px solid #1976D2;">
+                <h3 id="guia-leads">-</h3>
+                <p>📄 Guia PDF</p>
+            </div>
+            <div class="stat-card" style="border-left: 3px solid #36B39B;">
+                <h3 id="curso-leads">-</h3>
+                <p>📚 Curso</p>
+            </div>
         </div>
         
         <div class="content">
@@ -380,6 +388,10 @@ ADMIN_HTML = '''
                 <button class="filter-btn active" onclick="filterLeads('all')">Todos</button>
                 <button class="filter-btn" onclick="filterLeads('pending')">Pendentes</button>
                 <button class="filter-btn" onclick="filterLeads('sent')">Enviados</button>
+                <span style="border-left: 1px solid #ddd; margin: 0 10px;"></span>
+                <button class="filter-btn" onclick="filterLeads('guia')" style="border-color:#1976D2;color:#1976D2;">📄 Guia</button>
+                <button class="filter-btn" onclick="filterLeads('curso')" style="border-color:#36B39B;color:#36B39B;">📚 Curso</button>
+                <span style="border-left: 1px solid #ddd; margin: 0 10px;"></span>
                 <button class="filter-btn" onclick="loadLeads()">🔄 Atualizar</button>
             </div>
             
@@ -481,10 +493,14 @@ ADMIN_HTML = '''
             const total = allLeads.length;
             const pending = allLeads.filter(l => !l.email_sent).length;
             const sent = allLeads.filter(l => l.email_sent).length;
+            const guia = allLeads.filter(l => l.source !== 'curso').length;
+            const curso = allLeads.filter(l => l.source === 'curso').length;
             
             document.getElementById('total-leads').textContent = total;
             document.getElementById('pending-emails').textContent = pending;
             document.getElementById('sent-emails').textContent = sent;
+            document.getElementById('guia-leads').textContent = guia;
+            document.getElementById('curso-leads').textContent = curso;
         }
         
         function filterLeads(filter) {
@@ -501,6 +517,10 @@ ADMIN_HTML = '''
                 filtered = allLeads.filter(l => !l.email_sent);
             } else if (filter === 'sent') {
                 filtered = allLeads.filter(l => l.email_sent);
+            } else if (filter === 'guia') {
+                filtered = allLeads.filter(l => l.source !== 'curso');
+            } else if (filter === 'curso') {
+                filtered = allLeads.filter(l => l.source === 'curso');
             }
             
             displayLeads(filtered);
@@ -515,7 +535,7 @@ ADMIN_HTML = '''
             }
             
             let html = '<table class="leads-table"><thead><tr>';
-            html += '<th>ID</th><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Data</th><th>Status</th><th>Ações</th>';
+            html += '<th>ID</th><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Origem</th><th>Data</th><th>Status</th><th>Ações</th>';
             html += '</tr></thead><tbody>';
             
             leads.forEach(lead => {
@@ -532,10 +552,16 @@ ADMIN_HTML = '''
                     return div.innerHTML;
                 };
                 
+                // Definir badge de origem
+                const sourceLabel = lead.source === 'curso' 
+                    ? '<span style="background:#e6f7f4;color:#36B39B;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:600;">📚 Curso</span>'
+                    : '<span style="background:#e7f3ff;color:#1976D2;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:600;">📄 Guia</span>';
+                
                 html += `<td>${lead.id}</td>`;
                 html += `<td>${sanitize(lead.name)}</td>`;
                 html += `<td>${sanitize(lead.email)}</td>`;
                 html += `<td>${sanitize(lead.phone)}</td>`;
+                html += `<td>${sourceLabel}</td>`;
                 html += `<td>${date}</td>`;
                 html += `<td>${status}</td>`;
                 html += '<td>';
@@ -879,6 +905,7 @@ def init_db():
                     email VARCHAR(255) NOT NULL,
                     phone VARCHAR(50),
                     consent BOOLEAN NOT NULL DEFAULT FALSE,
+                    source VARCHAR(50) DEFAULT 'guia',
                     user_agent TEXT,
                     ip_address VARCHAR(45),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -886,6 +913,12 @@ def init_db():
                     email_sent_at TIMESTAMP
                 )
             ''')
+            
+            # Adicionar coluna source se não existir (para bancos existentes)
+            try:
+                cursor.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'guia'")
+            except:
+                pass
             
             # Índices
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_email ON leads(email)')
@@ -918,6 +951,7 @@ def init_db_sqlite():
             email TEXT NOT NULL,
             phone TEXT NOT NULL,
             consent BOOLEAN NOT NULL,
+            source TEXT DEFAULT 'guia',
             user_agent TEXT,
             ip_address TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -925,6 +959,12 @@ def init_db_sqlite():
             email_sent_at TIMESTAMP
         )
     ''')
+    
+    # Adicionar coluna source se não existir (para bancos existentes)
+    try:
+        cursor.execute("ALTER TABLE leads ADD COLUMN source TEXT DEFAULT 'guia'")
+    except:
+        pass
     
     # Índices para melhor performance
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_email ON leads(email)')
@@ -1518,6 +1558,11 @@ def create_lead():
         email = sanitize_input(data.get('email', '')).lower().strip()
         phone = sanitize_input(data.get('phone', ''))
         consent = bool(data.get('consent', False))
+        source = sanitize_input(data.get('source', 'guia'))  # Origem: 'guia' ou 'curso'
+        
+        # Validar source (apenas valores permitidos)
+        if source not in ['guia', 'curso']:
+            source = 'guia'
         
         # Validações
         if not name or len(name) < 3:
@@ -1552,9 +1597,9 @@ def create_lead():
         ip_address = request.remote_addr
         
         cursor = execute_query(conn, '''
-            INSERT INTO leads (name, email, phone, consent, user_agent, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (name, email, phone, consent, user_agent, ip_address))
+            INSERT INTO leads (name, email, phone, consent, source, user_agent, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (name, email, phone, consent, source, user_agent, ip_address))
         
         if USE_POSTGRESQL:
             # PostgreSQL precisa fazer commit antes de pegar o ID
@@ -1566,7 +1611,7 @@ def create_lead():
         conn.commit()
         conn.close()
         
-        logger.info(f'Lead criado com sucesso: {email} (ID: {lead_id})')
+        logger.info(f'Lead criado com sucesso: {email} (ID: {lead_id}, origem: {source})')
         
         # Preparar dados para envio de e-mail em background
         email_subject = f'Seu PDF: {GUIDE_TITLE}'

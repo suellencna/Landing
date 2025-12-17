@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Formação Investir para Realizar | Investir é Realizar</title>
+  <meta name="description" content="Aprenda a investir do zero com o método INVISTA. 7 módulos, 14 aulas práticas. Dinheiro é meio, não fim. Investir é Realizar." />
+  <meta name="keywords" content="curso investimentos, formação investir, aprender investir, método INVISTA, investimentos iniciantes" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles-curso.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="container">
+    <div class="brand">
+      <a href="index.html" class="logo">
+        <i class="fas fa-chart-line"></i>
+        Investir é Realizar
+      </a>
+      <div class="tagline">Dinheiro é meio, não fim.</div>
+    </div>
+    <nav class="nav">
+      <a href="index.html">Guia Gratuito</a>
+      <a href="https://www.instagram.com/suellenandradepinto/" target="_blank" rel="noopener" class="instagram-link">
+        <i class="fab fa-instagram"></i>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <div class="badge">
+          <i class="fas fa-graduation-cap"></i> Lista de Espera
+        </div>
+        <h1>Formação Investir para Realizar</h1>
+        <p class="subtitle">O método INVISTA em 7 módulos para você investir com segurança, constância e propósito.</p>
+        
+        <div class="method-preview">
+          <h3>Método INVISTA</h3>
+          <ul class="method-steps">
+            <li><span class="step-letter">I</span> Identificar — Clareza do caminho</li>
+            <li><span class="step-letter">N</span> Neutralizar — Fundamentos simples</li>
+            <li><span class="step-letter">V</span> Visão — Primeiros investimentos</li>
+            <li><span class="step-letter">I</span> Iniciar — Estratégias inteligentes</li>
+            <li><span class="step-letter">S</span> Sustentar — Resultados e métricas</li>
+            <li><span class="step-letter">T</span> Transformar — Vida real do investidor</li>
+            <li><span class="step-letter">A</span> Acelerar — Crescimento com segurança</li>
+          </ul>
+        </div>
+
+        <ul class="bullets">
+          <li><i class="fas fa-check"></i> 14 aulas práticas em vídeos de 8–12 minutos</li>
+          <li><i class="fas fa-check"></i> Planilhas e materiais prontos para usar</li>
+          <li><i class="fas fa-check"></i> Do diagnóstico financeiro ao primeiro investimento</li>
+          <li><i class="fas fa-check"></i> Linguagem direta, sem economês</li>
+        </ul>
+
+        <p class="note"><i class="fas fa-info-circle"></i> Conteúdo educativo. Não é recomendação individual de investimento.</p>
+      </div>
+
+      <div class="form-card">
+        <div class="form-header">
+          <h2>Entre na lista de espera</h2>
+          <p>Seja o primeiro a saber quando abrirem as vagas</p>
+        </div>
+        <form id="leadForm" novalidate>
+          <div class="field">
+            <label for="name">
+              <i class="fas fa-user"></i> Nome
+            </label>
+            <input type="text" id="name" name="name" placeholder="Seu nome" required autocomplete="name">
+            <span class="field-error" id="nameError"></span>
+          </div>
+          <div class="field">
+            <label for="email">
+              <i class="fas fa-envelope"></i> E-mail
+            </label>
+            <input type="email" id="email" name="email" placeholder="seuemail@exemplo.com" required autocomplete="email">
+            <span class="field-error" id="emailError"></span>
+          </div>
+          <div class="field">
+            <label for="phone">
+              <i class="fas fa-phone"></i> WhatsApp
+            </label>
+            <input type="tel" id="phone" name="phone" placeholder="(11) 99999-9999" required autocomplete="tel">
+            <small class="help">Formato: (DDD) 99999-9999</small>
+            <span class="field-error" id="phoneError"></span>
+          </div>
+
+          <!-- Honeypot antispam -->
+          <input type="text" name="website" id="website" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;">
+          <!-- Campo oculto para identificar origem -->
+          <input type="hidden" id="source" name="source" value="curso">
+
+          <div class="consent">
+            <input type="checkbox" id="consent" required>
+            <label for="consent">
+              Autorizo o envio de comunicações por e-mail e WhatsApp, e concordo com o 
+              <a href="privacy.html" target="_blank">Aviso de Privacidade</a>.
+            </label>
+          </div>
+
+          <button type="submit" id="submitBtn" class="btn btn-primary">
+            <span class="btn-text">
+              <i class="fas fa-bell"></i> Quero ser avisado
+            </span>
+            <span class="btn-loading" style="display: none;">
+              <i class="fas fa-spinner fa-spin"></i> Enviando...
+            </span>
+          </button>
+          <p class="microcopy">
+            <i class="fas fa-heart"></i> Prometemos não encher você de mensagens.
+          </p>
+          <div class="error" id="formError" role="alert" aria-live="assertive"></div>
+          <div class="success" id="formSuccess" aria-live="polite"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="modulos" class="modules">
+    <div class="container">
+      <h2><i class="fas fa-book-open"></i> O que você vai aprender</h2>
+      
+      <div class="modules-grid">
+        <div class="module-card">
+          <div class="module-number">1</div>
+          <h3>Identificar</h3>
+          <p>Boas-vindas e Mapa da Jornada. Clareza do caminho, ponto de partida definido.</p>
+          <span class="module-tag">2 aulas</span>
+        </div>
+        
+        <div class="module-card">
+          <div class="module-number">2</div>
+          <h3>Neutralizar</h3>
+          <p>Fundamentos simples que funcionam. O básico do dinheiro sem jargões.</p>
+          <span class="module-tag">2 aulas</span>
+        </div>
+        
+        <div class="module-card">
+          <div class="module-number">3</div>
+          <h3>Visão</h3>
+          <p>Aplicação prática. Primeira aplicação guiada e plano de aportes.</p>
+          <span class="module-tag">2 aulas</span>
+        </div>
+        
+        <div class="module-card">
+          <div class="module-number">4</div>
+          <h3>Iniciar</h3>
+          <p>Estratégias avançadas sem complicar. Diversificação inteligente.</p>
+          <span class="module-tag">2 aulas</span>
+        </div>
+        
+        <div class="module-card">
+          <div class="module-number">5</div>
+          <h3>Sustentar</h3>
+          <p>Resultados e métricas. Medir evolução e otimizar juros compostos.</p>
+          <span class="module-tag">2 aulas</span>
+        </div>
+        
+        <div class="module-card">
+          <div class="module-number">6</div>
+          <h3>Transformar</h3>
+          <p>Vida real do investidor. Planos para imprevistos e relacionamentos.</p>
+          <span class="module-tag">2 aulas</span>
+        </div>
+        
+        <div class="module-card">
+          <div class="module-number">7</div>
+          <h3>Acelerar</h3>
+          <p>Aceleração com segurança. Aumentar aportes e diversificar progressivamente.</p>
+          <span class="module-tag">2 aulas</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="transformation">
+    <div class="container">
+      <h2><i class="fas fa-rocket"></i> Ao final, você será capaz de</h2>
+      <div class="transform-grid">
+        <div class="transform-item">
+          <i class="fas fa-piggy-bank"></i>
+          <span>Montar e manter sua reserva de emergência</span>
+        </div>
+        <div class="transform-item">
+          <i class="fas fa-hand-holding-usd"></i>
+          <span>Fazer sua primeira aplicação com segurança</span>
+        </div>
+        <div class="transform-item">
+          <i class="fas fa-sync-alt"></i>
+          <span>Automatizar seus aportes mensais</span>
+        </div>
+        <div class="transform-item">
+          <i class="fas fa-chart-line"></i>
+          <span>Medir sua evolução com clareza</span>
+        </div>
+        <div class="transform-item">
+          <i class="fas fa-shield-alt"></i>
+          <span>Evitar armadilhas e golpes do mercado</span>
+        </div>
+        <div class="transform-item">
+          <i class="fas fa-arrow-up"></i>
+          <span>Aumentar aportes e diversificar com segurança</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="materials">
+    <div class="container">
+      <h2><i class="fas fa-gift"></i> Materiais inclusos</h2>
+      <div class="materials-grid">
+        <div class="material-item">
+          <i class="fas fa-file-excel"></i>
+          <div>
+            <strong>Planilhas práticas</strong>
+            <p>Raio-X Financeiro, Meta de Reserva, Aportes Automáticos, Dashboard</p>
+          </div>
+        </div>
+        <div class="material-item">
+          <i class="fas fa-tasks"></i>
+          <div>
+            <strong>Checklists</strong>
+            <p>Abertura de conta, Primeira compra, Ritual mensal, Anti-golpes</p>
+          </div>
+        </div>
+        <div class="material-item">
+          <i class="fas fa-file-pdf"></i>
+          <div>
+            <strong>PDFs exclusivos</strong>
+            <p>Mapa da Jornada, Conceitos do Jeito Certo, Plano B Financeiro</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-final">
+    <div class="container">
+      <div class="cta-box">
+        <h2>Constância > Valor</h2>
+        <p>Começar pequeno. Crescer com segurança. Esse é o caminho.</p>
+        <a href="#" class="btn btn-primary btn-large" onclick="document.getElementById('name').focus(); return false;">
+          <i class="fas fa-bell"></i> Entrar na lista de espera
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p class="privacy-brief">
+      <i class="fas fa-lock"></i>
+      Coletamos apenas nome, e-mail e telefone para avisá-lo sobre o curso (base legal: consentimento).
+      Não vendemos seus dados. Você pode se descadastrar a qualquer momento.
+    </p>
+    <p><a href="privacy.html"><i class="fas fa-shield-alt"></i> Política de Privacidade</a></p>
+    <div class="social-links">
+      <a href="https://www.instagram.com/suellenandradepinto/" target="_blank" rel="noopener" aria-label="Instagram">
+        <i class="fab fa-instagram"></i>
+      </a>
+    </div>
+    <p class="small">© <span id="year"></span> Investir é Realizar. Todos os direitos reservados.</p>
+    <p class="small disclaimer">Conteúdo educativo. Não constitui recomendação individual de investimento.</p>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+<script src="assets/script-curso.js"></script>
+</body>
+</html>
+

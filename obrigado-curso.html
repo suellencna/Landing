@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Você está na lista! | Formação Investir para Realizar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles-curso.css" />
+  <style>
+    .thankyou {
+      display: flex;
+      min-height: 80vh;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 48px 0;
+    }
+    .thankyou-content {
+      max-width: 600px;
+    }
+    .success-icon {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 24px;
+      background: var(--menta);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: scaleIn 0.5s;
+    }
+    .success-icon i {
+      font-size: 50px;
+      color: var(--branco);
+    }
+    @keyframes scaleIn {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+    .thankyou h1 {
+      font-family: 'Montserrat', sans-serif;
+      color: var(--grafite);
+      font-weight: 800;
+      font-size: clamp(28px, 4vw, 36px);
+      margin-bottom: 16px;
+    }
+    .lead {
+      font-size: 18px;
+      color: var(--cinza);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .next-steps {
+      margin: 32px 0;
+      padding: 24px;
+      background: var(--cinza-bg);
+      border-radius: 12px;
+      text-align: left;
+    }
+    .next-steps h3 {
+      font-family: 'Montserrat', sans-serif;
+      color: var(--grafite);
+      font-size: 18px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .next-steps h3 i {
+      color: var(--menta);
+    }
+    .next-steps ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .next-steps li {
+      margin: 12px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      color: var(--grafite);
+    }
+    .next-steps li i {
+      color: var(--menta-hover);
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+    .back-link {
+      margin-top: 32px;
+    }
+    .back-link a {
+      color: var(--menta-hover);
+      text-decoration: none;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="container">
+    <div class="brand">
+      <a href="index.html" class="logo">
+        <i class="fas fa-chart-line"></i>
+        Investir é Realizar
+      </a>
+      <div class="tagline">Dinheiro é meio, não fim.</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="thankyou">
+    <div class="container">
+      <div class="thankyou-content">
+        <div class="success-icon">
+          <i class="fas fa-bell"></i>
+        </div>
+        <h1>Você está na lista!</h1>
+        <p class="lead">
+          Assim que as vagas da <strong>Formação Investir para Realizar</strong> abrirem, você será o primeiro a saber.
+        </p>
+        
+        <div class="next-steps">
+          <h3><i class="fas fa-clock"></i> Enquanto isso...</h3>
+          <ul>
+            <li>
+              <i class="fas fa-check"></i>
+              <span>Fique de olho no seu e-mail (e na caixa de spam!)</span>
+            </li>
+            <li>
+              <i class="fas fa-check"></i>
+              <span>Siga nosso <a href="https://www.instagram.com/suellenandradepinto/" target="_blank" style="color: var(--menta-hover);">Instagram</a> para dicas e novidades</span>
+            </li>
+            <li>
+              <i class="fas fa-check"></i>
+              <span>Baixe nosso <a href="index.html" style="color: var(--menta-hover);">Guia Gratuito de Corretoras</a> se ainda não baixou</span>
+            </li>
+          </ul>
+        </div>
+        
+        <p style="color: var(--cinza); font-size: 14px; margin-top: 24px;">
+          <i class="fas fa-heart" style="color: var(--menta);"></i> 
+          Prometemos não encher você de mensagens. Só o essencial!
+        </p>
+        
+        <div class="back-link">
+          <a href="index.html">
+            <i class="fas fa-arrow-left"></i> Voltar para a página inicial
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="social-links">
+      <a href="https://www.instagram.com/suellenandradepinto/" target="_blank" rel="noopener" aria-label="Instagram">
+        <i class="fab fa-instagram"></i>
+      </a>
+    </div>
+    <p class="small">© <span id="year"></span> Investir é Realizar. Todos os direitos reservados.</p>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
+
