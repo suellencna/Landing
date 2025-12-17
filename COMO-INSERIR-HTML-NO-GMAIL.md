@@ -76,3 +76,5 @@ Criei uma versão mais compatível com o Gmail. Veja o arquivo `TEMPLATE-EMAIL-G
 
 Se nenhum método funcionar, me avise e eu crio uma versão ainda mais simples ou uma alternativa!
 
+
+

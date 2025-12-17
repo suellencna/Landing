@@ -56,3 +56,5 @@ As variáveis do Resend são **opcionais**. O código funciona perfeitamente sem
 
 **Status:** Código atualizado - aguardando resultado do build
 
+
+

@@ -103,3 +103,5 @@ Depois de criar o primeiro e-mail com HTML:
 
 **Pronto! Agora você consegue inserir HTML no Gmail!** 🚀
 
+
+

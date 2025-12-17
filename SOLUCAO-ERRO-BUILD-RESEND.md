@@ -76,3 +76,5 @@ Se o erro persistir mesmo com a variável configurada, pode ser um bug do Railwa
 
 **Status:** Aguardando verificação das variáveis no Railway
 
+
+

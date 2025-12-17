@@ -120,3 +120,5 @@ INFO: ✅ Métodos de envio configurados: SendGrid, SMTP
 - SendGrid é uma boa alternativa enquanto não verifica o domínio
 - O código já detecta esse erro e mostra mensagens claras
 
+
+

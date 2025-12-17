@@ -180,3 +180,5 @@ Conforme [documentação](https://resend.com/docs/dashboard/emails/introduction)
 - API Key inválida ou sem permissões
 - E-mails indo para spam (verifique a pasta de spam)
 
+
+

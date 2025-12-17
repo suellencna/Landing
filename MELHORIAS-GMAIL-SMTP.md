@@ -169,3 +169,5 @@ O container no Railway:
 **Data:** 08/12/2025
 **Status:** ✅ Implementado e pronto para deploy
 
+
+

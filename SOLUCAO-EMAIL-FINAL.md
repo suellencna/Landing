@@ -140,3 +140,5 @@ INFO: ✅ E-mail enviado com sucesso via Resend para usuario@email.com (ID: ...)
 - Certifique-se de que pelo menos um método está configurado corretamente
 - Verifique se as variáveis de ambiente estão configuradas no provedor de hospedagem
 
+
+

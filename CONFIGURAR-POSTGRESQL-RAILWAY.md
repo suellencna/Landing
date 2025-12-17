@@ -67,3 +67,5 @@ O código que vou criar detecta automaticamente:
 
 **Próximo passo**: Adicione o PostgreSQL no Railway e me avise quando estiver pronto! 🚀
 
+
+

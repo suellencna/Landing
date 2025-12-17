@@ -187,3 +187,5 @@ No dashboard do Resend:
 
 Se todos os itens estão ✅ mas ainda não funciona, compartilhe os logs completos para análise.
 
+
+

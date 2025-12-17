@@ -113,3 +113,5 @@ Após configurar, o sistema usará Resend automaticamente e os e-mails serão en
 **Custo:** Gratuito (3.000 e-mails/mês)
 **Resultado:** E-mails funcionando 100%!
 
+
+

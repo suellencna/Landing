@@ -161,3 +161,5 @@ Após configurar, faça o deploy e teste. O sistema agora usa Resend (API REST) 
 
 **Dúvidas?** Consulte a documentação do Resend: https://resend.com/docs
 
+
+
